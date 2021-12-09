@@ -1,0 +1,204 @@
+{
+    "Hot Water": {
+        "Temperature": "DB40.DBD8",
+        "Setpoint": "DB112.DBD0",
+        "Valve": "Q4.3",
+        "Volume": "DB40.DBD88",
+        "Pump": "Q6.0",
+        "Flow Volume": "DB40.DBD0"
+    },
+    "Mash/Lauter": {
+        "Temperature": "DB40.DBD12",
+        "Setpoint": "DB112.DBD4",
+        "Valve": "Q4.0",
+        "Pump": "Q7.1",
+        "Pump Speed": "DB130.DBD108",
+        "Agitator": "Q7.0",
+        "Agitator Speed": "DB130.DBD104",
+        "Flow Meter": "DB40.DBD0"
+    },
+    "Wort Kettle": {
+        "Temperature": "DB40.DBD16",
+        "Setpoint": "DB112.DBD8",
+        "Valve1": "Q4.1",
+        "Valve2": "Q4.2",
+        "Chimney Temperature": "DB40.DBD162",
+        "Chimney Valve": "DB20.DBX5.1",
+        "Pump": "Q7.2",
+        "Pump Speed": "DB130.DBD112",
+        "Flow": "DB40.DBD104",
+        "Flow Volume": "DB40.DBD4"
+    },
+    "Ice Water": {
+        "Volume": "DB40.DBD92",
+        "Pump": "Q6.2"
+    },
+    "Glycol#1": {
+        "Temperature": "DB40.DBD20",
+        "Setpoint": "DB112.DBD12",
+        "Cooler1": "Q6.4",
+        "Cooler2": "Q6.5",
+        "Pump": "Q6.1"
+    },
+    "Glycol#2": {
+        "Temperature": "DB40.DBD136",
+        "Setpoint": "DB112.DBD104",
+        "Cooler3 Power": "DB20.DBX3.3",
+        "Cooler3": "DB20.DBX3.0",
+        "Pump": "DB20.DBX3.1"
+    },
+    "FV#1": {
+        "Temperature": "DB40.DBD24",
+        "Setpoint": "DB112.DBD16",
+        "Valve1": "Q4.4",
+        "Valve2": "Q4.5",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#2": {
+        "Temperature": "DB40.DBD28",
+        "Setpoint": "DB112.DBD20",
+        "Valve1": "Q4.6",
+        "Valve2": "Q4.7",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#3": {
+        "Temperature": "DB40.DBD32",
+        "Setpoint": "DB112.DBD24",
+        "Valve1": "Q5.0",
+        "Valve2": "Q5.1",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#4": {
+        "Temperature": "DB40.DBD36",
+        "Setpoint": "DB112.DBD28",
+        "Valve1": "Q5.2",
+        "Valve2": "Q5.3",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#5": {
+        "Temperature": "DB40.DBD40",
+        "Setpoint": "DB112.DBD32",
+        "Valve1": "Q5.4",
+        "Valve2": "Q5.6",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#6": {
+        "Temperature": "DB40.DBD44",
+        "Setpoint": "DB112.DBD36",
+        "Valve1": "Q5.6",
+        "Valve2": "Q5.7",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#7": {
+        "Temperature": "DB40.DBD48",
+        "Setpoint": "DB112.DBD40",
+        "Valve1": "Q8.0",
+        "Valve2": "Q8.1",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#8": {
+        "Temperature": "DB40.DBD52",
+        "Setpoint": "DB112.DBD44",
+        "Valve1": "Q8.2",
+        "Valve2": "Q8.3",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#9": {
+        "Temperature": "DB40.DBD56",
+        "Setpoint": "DB112.DBD48",
+        "Valve1": "Q8.4",
+        "Valve2": "Q8.5",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#10": {
+        "Temperature": "DB40.DBD60",
+        "Setpoint": "DB112.DBD52",
+        "Valve1": "Q8.6",
+        "Valve2": "Q8.7",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#11": {
+        "Temperature": "DB40.DBD64",
+        "Setpoint": "DB112.DBD56",
+        "Valve1": "Q9.0",
+        "Valve2": "Q9.1",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#12": {
+        "Temperature": "DB40.DBD68",
+        "Setpoint": "DB112.DBD60",
+        "Valve1": "Q9.2",
+        "Valve2": "Q9.3",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#13": {
+        "Temperature": "DB40.DBD72",
+        "Setpoint": "DB112.DBD64",
+        "Valve1": "Q9.4",
+        "Valve2": "Q9.5",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#14": {
+        "Temperature": "DB40.DBD76",
+        "Setpoint": "DB112.DBD68",
+        "Valve1": "Q9.6",
+        "Valve2": "Q9.7",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#15": {
+        "Temperature": "DB40.DBD80",
+        "Setpoint": "DB112.DBD72",
+        "Valve1": "Q10.0",
+        "Valve2": "Q10.1",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#16": {
+        "Temperature": "DB40.DBD84",
+        "Setpoint": "DB112.DBD76",
+        "Valve1": "Q10.2",
+        "Valve2": "Q10.3",
+        "Glycol": "DB40.DBD20"
+    },
+    "FV#17": {
+        "Temperature": "DB40.DBD112",
+        "Setpoint": "DB112.DBD80",
+        "Valve1": "DB20.DBX3.4",
+        "Valve2": "DB20.DBX3.5",
+        "Glycol": "DB40.DBD136"
+    },
+    "FV#18": {
+        "Temperature": "DB40.DBD116",
+        "Setpoint": "DB112.DBD84",
+        "Valve1": "DB20.DBX3.6",
+        "Valve2": "DB20.DBX3.7",
+        "Glycol": "DB40.DBD136"
+    },
+    "FV#19": {
+        "Temperature": "DB40.DBD120",
+        "Setpoint": "DB112.DBD88",
+        "Valve1": "DB20.DBX4.0",
+        "Valve2": "DB20.DBX4.1",
+        "Glycol": "DB40.DBD136"
+    },
+    "FV#20": {
+        "Temperature": "DB40.DBD124",
+        "Setpoint": "DB112.DBD92",
+        "Valve1": "DB20.DBX4.2",
+        "Valve2": "DB20.DBX4.3",
+        "Glycol": "DB40.DBD136"
+    },
+    "FV#21": {
+        "Temperature": "DB40.DBD128",
+        "Setpoint": "DB112.DBD96",
+        "Valve1": "DB20.DBX4.4",
+        "Valve2": "DB20.DBX4.5",
+        "Glycol": "DB40.DBD136"
+    },
+    "FV#22": {
+        "Temperature": "DB40.DBD132",
+        "Setpoint": "DB112.DBD100",
+        "Valve1": "DB20.DBX4.6",
+        "Valve2": "DB20.DBX4.7",
+        "Glycol": "DB40.DBD136"
+    }
+}

@@ -1,0 +1,3 @@
+[console_scripts]
+shopyo = shopyo.api.cli:cli
+

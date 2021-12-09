@@ -1,0 +1,5 @@
+[console_scripts]
+frp.py = frp:_main
+frpc.py = frpc:_main
+frps.py = frps:_main
+
