@@ -70,7 +70,9 @@ class zmb_plc():
             for value in self.__plc_tag[item].values():
                 tag = value.split('.')
                 if tag[0].startswith('DB'):
-                    if tag[1].startswith('DBD'):#db client.db_read(int(tag[0][2:]), int(tag[1][3:]), 4)
+                    if tag[1].startswith('DBDDI'):#db client.db_read(int(tag[0][2:]), int(tag[1][3:]), 4)
+                        data.append(snap7.util.get_dint(client.db_read(int(tag[0][2:]), int(tag[1][5:]), 4), 0))  # DB40.DBD8
+                    elif tag[1].startswith('DBD'):#db client.db_read(int(tag[0][2:]), int(tag[1][3:]), 4)
                         data.append(snap7.util.get_real(client.db_read(int(tag[0][2:]), int(tag[1][3:]), 4), 0))  # DB40.DBD8
                     elif tag[1].startswith('DBX'):
                         data.append(1 if snap7.util.get_bool(client.db_read(int(tag[0][2:]), int(tag[1][3:]), 1), 0,int(tag[2])) == True else 0)  # DB40.DBX3.3

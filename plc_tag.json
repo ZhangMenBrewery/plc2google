@@ -15,7 +15,7 @@
         "Pump Speed": "DB130.DBD108",
         "Agitator": "Q7.0",
         "Agitator Speed": "DB130.DBD104",
-        "Flow Meter": "DB40.DBD0"
+        "Flow Meter": "DB40.DBDDI0"
     },
     "Wort Kettle": {
         "Temperature": "DB40.DBD16",
@@ -27,7 +27,7 @@
         "Pump": "Q7.2",
         "Pump Speed": "DB130.DBD112",
         "Flow": "DB40.DBD104",
-        "Flow Volume": "DB40.DBD4"
+        "Flow Volume": "DB40.DBDDI4"
     },
     "Ice Water": {
         "Volume": "DB40.DBD92",
