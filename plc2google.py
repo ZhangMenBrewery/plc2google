@@ -94,7 +94,7 @@ class zmb_plc():
                     pass
             wks.update_values(f"A{rows}:{dict(zip(range(1,27),string.ascii_uppercase))[len(self.__plc_tag[item])+1]}{rows}", [data, ])    
 
-        #建立sql連線
+    #建立sql連線
     def connect_db(self, db):
         connection = None
         try:
@@ -121,11 +121,11 @@ class zmb_plc():
         cur = conn.cursor()
 
         for item in self.__plc_tag.keys():
-            print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > {item}")
+            print(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} > {item}")
             wks = ss.worksheet_by_title(item)
             rows = len(wks.get_col(1, include_tailing_empty=False))+1
             data = []
-            data.append(time.strftime('%m/%d/%Y %H:%M:%S', time.localtime()))
+            data.append(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
             for value in self.__plc_tag[item].values():
                 tag = value.split('.')
                 if tag[0].startswith('DB'):
@@ -143,10 +143,10 @@ class zmb_plc():
                     pass
             wks.update_values(f"A{rows}:{dict(zip(range(1,27),string.ascii_uppercase))[len(self.__plc_tag[item])+1]}{rows}", [data, ])
             sql_insert = self.__sql_insert_tag[item]
-            # data.insert(0,'')
+            # data.insert(0,'')s
             # print(data)
-            data[0] = datetime.datetime.strptime(data[0], '%m/%d/%Y %H:%M:%S')
-            data[0] = data[0].strftime('%Y-%m-%d %H:%M:%S')
+            # data[0] = datetime.datetime.strptime(data[0], '%m/%d/%Y %H:%M:%S')
+            # data[0] = data[0].strftime('%Y-%m-%d %H:%M:%S')
             if str(item).startswith('FV'):
                 data = data[:-1]
             cur.execute(sql_insert, tuple(data))
@@ -155,16 +155,16 @@ class zmb_plc():
         conn.close()
 
 def main():
-        # while True:
-        try:
-            plc_obj = zmb_plc()
-            ss_obj = plc_obj.open_ss()
-            plc_obj.write_to_sheet_sql(ss_obj)
-        except Exception as error:
-            print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > {error} ")
-            time.sleep(60)
-        print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > Sleeping 300sec")
-        time.sleep(300)
+        while True:
+            try:
+                plc_obj = zmb_plc()
+                ss_obj = plc_obj.open_ss()
+                plc_obj.write_to_sheet_sql(ss_obj)
+            except Exception as error:
+                print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > {error} ")
+                time.sleep(60)
+            print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > Sleeping 300sec")
+            time.sleep(300)
 
 if __name__ == '__main__':
     main()
