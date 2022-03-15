@@ -21,10 +21,10 @@
     "FV#14": "INSERT INTO plc_fv14 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
     "FV#15": "INSERT INTO plc_fv15 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
     "FV#16": "INSERT INTO plc_fv16 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
-    "FV#17": "INSERT INTO plc_fv17 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
-    "FV#18": "INSERT INTO plc_fv18 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
-    "FV#19": "INSERT INTO plc_fv19 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
-    "FV#20": "INSERT INTO plc_fv20 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
-    "FV#21": "INSERT INTO plc_fv21 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)",
-    "FV#22": "INSERT INTO plc_fv22 (id, timestamp, temperature, setpoint, valve1, valve2) VALUES (NULL, %s, %s, %s, %s, %s)"
+    "FV#17": "INSERT INTO plc_fv17 (id, timestamp, temperature, setpoint, valve1, valve2, PSI, PSI_SP, CO2VOL, CO2VOL_SP, Valve3) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    "FV#18": "INSERT INTO plc_fv18 (id, timestamp, temperature, setpoint, valve1, valve2, PSI, PSI_SP, CO2VOL, CO2VOL_SP, Valve3) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    "FV#19": "INSERT INTO plc_fv19 (id, timestamp, temperature, setpoint, valve1, valve2, PSI, PSI_SP, CO2VOL, CO2VOL_SP, Valve3) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    "FV#20": "INSERT INTO plc_fv20 (id, timestamp, temperature, setpoint, valve1, valve2, PSI, PSI_SP, CO2VOL, CO2VOL_SP, Valve3) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    "FV#21": "INSERT INTO plc_fv21 (id, timestamp, temperature, setpoint, valve1, valve2, PSI, PSI_SP, CO2VOL, CO2VOL_SP, Valve3) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+    "FV#22": "INSERT INTO plc_fv22 (id, timestamp, temperature, setpoint, valve1, valve2, PSI, PSI_SP, CO2VOL, CO2VOL_SP, Valve3) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 }

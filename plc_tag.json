@@ -164,6 +164,11 @@
         "Setpoint": "DB112.DBD80",
         "Valve1": "DB20.DBX3.4",
         "Valve2": "DB20.DBX3.5",
+        "PSI": "DB40.DBD166",
+        "PSI_SP": "DB51.DBD0",
+        "CO2VOL": "DB40.DBD190",
+        "CO2VOL_SP": "DB51.DBD24",
+        "Valve3": "DB20.DBX5.2",
         "Glycol": "DB40.DBD136"
     },
     "FV#18": {
@@ -171,6 +176,11 @@
         "Setpoint": "DB112.DBD84",
         "Valve1": "DB20.DBX3.6",
         "Valve2": "DB20.DBX3.7",
+        "PSI": "DB40.DBD170",
+        "PSI_SP": "DB51.DBD4",
+        "CO2VOL": "DB40.DBD194",
+        "CO2VOL_SP": "DB51.DBD28",
+        "Valve3": "DB20.DBX5.3",
         "Glycol": "DB40.DBD136"
     },
     "FV#19": {
@@ -178,6 +188,11 @@
         "Setpoint": "DB112.DBD88",
         "Valve1": "DB20.DBX4.0",
         "Valve2": "DB20.DBX4.1",
+        "PSI": "DB40.DBD174",
+        "PSI_SP": "DB51.DBD8",
+        "CO2VOL": "DB40.DBD198",
+        "CO2VOL_SP": "DB51.DBD32",
+        "Valve3": "DB20.DBX5.4",
         "Glycol": "DB40.DBD136"
     },
     "FV#20": {
@@ -185,6 +200,11 @@
         "Setpoint": "DB112.DBD92",
         "Valve1": "DB20.DBX4.2",
         "Valve2": "DB20.DBX4.3",
+        "PSI": "DB40.DBD178",
+        "PSI_SP": "DB51.DBD12",
+        "CO2VOL": "DB40.DBD202",
+        "CO2VOL_SP": "DB51.DBD36",
+        "Valve3": "DB20.DBX5.5",
         "Glycol": "DB40.DBD136"
     },
     "FV#21": {
@@ -192,6 +212,11 @@
         "Setpoint": "DB112.DBD96",
         "Valve1": "DB20.DBX4.4",
         "Valve2": "DB20.DBX4.5",
+        "PSI": "DB40.DBD182",
+        "PSI_SP": "DB51.DBD16",
+        "CO2VOL": "DB40.DBD206",
+        "CO2VOL_SP": "DB51.DBD40",
+        "Valve3": "DB20.DBX5.6",
         "Glycol": "DB40.DBD136"
     },
     "FV#22": {
@@ -199,6 +224,11 @@
         "Setpoint": "DB112.DBD100",
         "Valve1": "DB20.DBX4.6",
         "Valve2": "DB20.DBX4.7",
+        "PSI": "DB40.DBD186",
+        "PSI_SP": "DB51.DBD20",
+        "CO2VOL": "DB40.DBD210",
+        "CO2VOL_SP": "DB51.DBD44",
+        "Valve3": "DB20.DBX5.7",
         "Glycol": "DB40.DBD136"
     }
 }
