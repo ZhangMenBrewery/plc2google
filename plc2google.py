@@ -1,14 +1,14 @@
+from urllib import request
 import mysql.connector
 from mysql.connector import Error
-from pyasn1.type.univ import Null
 import pygsheets
 import time
 import datetime
-import numpy
-import pytz
 import snap7
 import json
 import string
+import os
+import requests
 
 
 class zmb_plc():
@@ -112,6 +112,7 @@ class zmb_plc():
     def write_to_sheet_sql(self,ss):
         client = snap7.client.Client()
         client.connect("192.168.60.201", 0, 2)
+        token = 'ypWJFnAK7qffYVaHFsDZgXNfhc1RZs5DekSkKVB73kO'
     #    plc_di = client.eb_read(0, 7)
     #    print(snap7.util.get_bool(plc_di,6,1))
     #    plc_do = client.ab_read(0 ,11)
@@ -149,10 +150,63 @@ class zmb_plc():
             # data[0] = data[0].strftime('%Y-%m-%d %H:%M:%S')
             if str(item).startswith('FV'):
                 data = data[:-1]
+                if (data[3] or [4] == 1) and (abs(data[1]-data[2])>1) and datetime.datetime.now().minute%2==0:
+                    msg = f'Waring: {item} Temperature: {data[2]} Setpoint:{data[1]}'
+                    lineNotifyMessage(token=token, msg=msg)
+            if str(item).startswith('Glycol#2'):
+                if (data[3] == 0) and datetime.datetime.now().minute%2==0:
+                    msg = f'Waring: {item} power id off'
+                    lineNotifyMessage(token=token, msg=msg)
+            if str(item).startswith('Glycol'):
+                if (data[4] == 1) and (abs(data[1]-data[2])>1) and datetime.datetime.now().minute%2==0:
+                    msg = f'Waring: {item} Temperature: {data[2]} Setpoint:{data[1]}'
+                    lineNotifyMessage(token=token, msg=msg)
             cur.execute(sql_insert, tuple(data))
             conn.commit()
         cur.close()
         conn.close()
+
+def mask(rawBytes):
+    data = [ord(i) for i in rawBytes]
+    length = len(rawBytes) + 128 if len(rawBytes) + 128 <= 254 else 254
+    Bytes = [0x81, length]
+    index = 2
+    mask = os.urandom(4)
+    for i in range(len(mask)):
+        Bytes.insert(i + index, mask[i])        
+    for i in range(len(data)):
+        data[i] ^= mask[i % 4]
+        Bytes.insert(i + index + 4, data[i])
+    return bytes(Bytes)
+
+def beername():
+    gc = pygsheets.authorize(service_account_file='zmb54685508-c88132768091.json')
+    ss_url = 'https://docs.google.com/spreadsheets/d/1QUh-ZHlJSFG0RhkmP0JT7WBxRUqC8EgCMwGn7lZVQas/edit#gid=877936540'
+    #ss means spreadsheet
+    ss = gc.open_by_url(ss_url)
+    #wks means worksheet
+    wks = ss.worksheet_by_title('發酵桶現況')
+    #讀取資料至pd
+    beername = wks.get_col(3)[1:23]
+    client = snap7.client.Client()
+    client.connect("192.168.60.201", 0, 2)
+    for i in range(len(beername)):
+        data = bytearray(256)
+        snap7.util.set_string(data, 0, beername[i], 255)
+        client.db_write(db_number=142, start=i*256, data=data)
+
+def lineNotifyMessage(token, msg, img=None):
+    """Send a LINE Notify message (with or without an image)."""
+    URL = 'https://notify-api.line.me/api/notify'
+    headers = {'Authorization': 'Bearer ' + token}
+    payload = {'message': msg}
+    files = {'imageFile': open(img, 'rb')} if img else None
+    r = requests.post(URL, headers=headers, params=payload, files=files)
+    if files:
+        files['imageFile'].close()
+    return r.status_code
+
+
 
 def main():
         while True:
@@ -160,6 +214,7 @@ def main():
                 plc_obj = zmb_plc()
                 ss_obj = plc_obj.open_ss()
                 plc_obj.write_to_sheet_sql(ss_obj)
+                beername()
             except Exception as error:
                 print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > {error} ")
                 time.sleep(60)
