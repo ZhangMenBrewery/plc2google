@@ -151,7 +151,7 @@ class zmb_plc():
             if str(item).startswith('FV'):
                 data = data[:-1]
                 if (data[3] or [4] == 1) and (abs(data[1]-data[2])>1) and datetime.datetime.now().minute%2==0:
-                    msg = f'Waring: {item} Temperature: {data[2]} Setpoint:{data[1]}'
+                    msg = f'Waring: {item} Temperature: {data[1]} Setpoint:{data[2]}'
                     lineNotifyMessage(token=token, msg=msg)
             if str(item).startswith('Glycol#2'):
                 if (data[3] == 0) and datetime.datetime.now().minute%2==0:
@@ -159,7 +159,7 @@ class zmb_plc():
                     lineNotifyMessage(token=token, msg=msg)
             if str(item).startswith('Glycol'):
                 if (data[4] == 1) and (abs(data[1]-data[2])>1) and datetime.datetime.now().minute%2==0:
-                    msg = f'Waring: {item} Temperature: {data[2]} Setpoint:{data[1]}'
+                    msg = f'Waring: {item} Temperature: {data[1]} Setpoint:{data[2]}'
                     lineNotifyMessage(token=token, msg=msg)
             cur.execute(sql_insert, tuple(data))
             conn.commit()
