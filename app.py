@@ -686,5 +686,5 @@ if __name__ == '__main__':
     # 啟動背景更新器
     start_background_updater()
     
-    # 啟動 Flask 伺服器
-    socketio.run(app, host='0.0.0.0', port=8001, debug=True, allow_unsafe_werkzeug=True)
+    # 啟動 Flask 伺服器（use_reloader=False 防止 Werkzeug 啟動第二個進程重複寫入）
+    socketio.run(app, host='0.0.0.0', port=8001, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
