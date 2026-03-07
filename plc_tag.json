@@ -26,7 +26,7 @@
         "Chimney Valve": "DB20.DBX5.1",
         "Pump": "Q7.2",
         "Pump Speed": "DB130.DBD112",
-        "Flow": "DB40.DBD104",
+        "Flowmeter": "DB40.DBD104",
         "Flow Volume": "DB40.DBDDI4"
     },
     "Ice Water": {
@@ -43,8 +43,8 @@
     "Glycol#2": {
         "Temperature": "DB40.DBD136",
         "Setpoint": "DB112.DBD104",
-        "Cooler3 Power": "DB20.DBX3.3",
-        "Cooler3": "DB20.DBX3.0",
+        "Cooler1": "DB20.DBX3.3",
+        "Cooler2": "DB20.DBX3.0",
         "Pump": "DB20.DBX3.1"
     },
     "FV#1": {

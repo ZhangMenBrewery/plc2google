@@ -10,6 +10,37 @@
     </div>
 </div>
 
+<!-- 一般設定 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sliders-h"></i> 一般設定
+            </div>
+            <div class="card-body">
+                <form id="generalSettingsForm">
+                    <div class="row align-items-end">
+                        <div class="col-md-4 mb-3">
+                            <label for="write_interval" class="form-label">資料寫入間隔（秒）</label>
+                            <input type="number" class="form-control" id="write_interval"
+                                   min="10" max="3600"
+                                   value="{{ general_config.write_interval if general_config else 300 }}">
+                            <div class="form-text">PLC 即時顯示固定 5 秒更新，此設定僅影響資料庫與 Google Sheets 的寫入頻率。原始預設值為 300 秒（5 分鐘）。</div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-primary d-block" onclick="saveGeneralSettings()">
+                                <i class="fas fa-save"></i> 儲存
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="generalStatus" class="mt-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- PLC 設定 -->
 <div class="row mb-4">
     <div class="col-12">
@@ -209,6 +240,32 @@ document.addEventListener('DOMContentLoaded', function() {
     loadPlcTags();
     loadRegionOrder();
 });
+
+// 儲存一般設定
+function saveGeneralSettings() {
+    const config = {
+        write_interval: parseInt(document.getElementById('write_interval').value)
+    };
+    fetch('/api/settings/general', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        const el = document.getElementById('generalStatus');
+        if (data.status === 'success') {
+            el.innerHTML = '<div class="alert alert-success">一般設定已儲存，立即生效。</div>';
+        } else {
+            el.innerHTML = '<div class="alert alert-danger">儲存失敗：' + data.message + '</div>';
+        }
+        setTimeout(() => el.innerHTML = '', 3000);
+    })
+    .catch(error => {
+        document.getElementById('generalStatus').innerHTML =
+            '<div class="alert alert-danger">儲存失敗：' + error + '</div>';
+    });
+}
 
 // 儲存 PLC 設定
 function savePlcSettings() {

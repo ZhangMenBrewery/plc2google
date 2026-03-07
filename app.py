@@ -53,6 +53,10 @@ class ZMBPlcReader:
         # 從設定檔案載入配置
         settings = load_settings()
         
+        # 一般設定
+        general_config = settings.get('general', {})
+        self.write_interval = general_config.get('write_interval', 300)
+        
         # Google Sheets 設定
         gs_config = settings.get('google_sheets', {})
         self.gs_key = gs_config.get('gs_key', 'zmb54685508-c88132768091.json')
@@ -123,50 +127,45 @@ class ZMBPlcReader:
                 dbname=self.sql_database
             )
             cur = conn.cursor()
+            success_count = 0
             
             for region, region_data in data.items():
                 table_name = region_to_table(region)
                 if not table_name:
                     continue
                 
-                # 建立資料表（如果不存在）
-                if region in self.sql_create_commands:
-                    cur.execute(self.sql_create_commands[region])
-                
-                # 準備插入數據
-                timestamp = region_data.get('timestamp', datetime.datetime.now())
-                tags = self.plc_tag.get(region, {})
-                
-                # 動態建立 INSERT 語句
-                columns = ['timestamp']
-                values = [timestamp]
-                
-                for tag_name in tags.keys():
-                    if tag_name in region_data and tag_name != 'timestamp':
-                        columns.append(tag_name.lower())
-                        values.append(region_data[tag_name])
-                
-                # 建立 SQL 語句
-                placeholders = ','.join(['%s'] * len(values))
-                col_names = ','.join(columns)
-                sql = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
-                
                 try:
+                    # 建立資料表（如果不存在），DDL 單獨 commit
+                    if region in self.sql_create_commands:
+                        cur.execute(self.sql_create_commands[region])
+                        conn.commit()
+                    
+                    # 動態建立 INSERT 語句（欄位名稱移除空格並轉小寫）
+                    timestamp = region_data.get('timestamp', datetime.datetime.now())
+                    tags = self.plc_tag.get(region, {})
+                    
+                    columns = ['timestamp']
+                    values = [timestamp]
+                    
+                    for tag_name in tags.keys():
+                        if tag_name in region_data and tag_name != 'timestamp':
+                            columns.append(tag_name.lower().replace(' ', ''))
+                            values.append(region_data[tag_name])
+                    
+                    placeholders = ','.join(['%s'] * len(values))
+                    col_names = ','.join(columns)
+                    sql = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
+                    
                     cur.execute(sql, values)
+                    conn.commit()
+                    success_count += 1
                 except Exception as e:
-                    # 如果失敗，嘗試簡化版本
-                    sql = f"INSERT INTO {table_name} (timestamp, temperature, setpoint, valve1, valve2) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
-                    cur.execute(sql, [
-                        timestamp,
-                        region_data.get('Temperature', 0),
-                        region_data.get('Setpoint', 0),
-                        region_data.get('Valve1', 0),
-                        region_data.get('Valve2', 0)
-                    ])
+                    print(f"寫入 {region} 到資料庫失敗：{e}")
+                    conn.rollback()
             
-            conn.commit()
             cur.close()
             conn.close()
+            print(f"資料庫寫入成功：{success_count}/{len(data)} 個區域")
         except Exception as e:
             print(f"寫入資料庫失敗：{e}")
     
@@ -181,34 +180,37 @@ class ZMBPlcReader:
             try:
                 ss = gc.open(self.gs_title)
             except pygsheets.SpreadsheetNotFound:
-                # 建立新的 Google Sheet
                 ss = gc.sheet.create(self.gs_title)
-                # 分享給相關人員
                 ss.share('', role='reader', type='anyone')
             
+            success_count = 0
             for region, region_data in data.items():
                 try:
-                    wks = ss.worksheet_by_title(region)
-                    if not wks:
-                        # 如果工作表不存在，建立它
-                        letter = string.ascii_uppercase[len(self.plc_tag.get(region, {})) + 1] if len(self.plc_tag.get(region, {})) < 26 else 'A'
-                        header = ['Time'] + list(self.plc_tag.get(region, {}).keys())
+                    # worksheet_by_title 找不到時會拋出例外，需用 try/except 處理
+                    try:
+                        wks = ss.worksheet_by_title(region)
+                    except pygsheets.WorksheetNotFound:
+                        tags = self.plc_tag.get(region, {})
+                        letter = string.ascii_uppercase[len(tags) + 1] if len(tags) < 26 else 'A'
+                        header = ['Time'] + list(tags.keys())
                         wks = ss.add_worksheet(title=region, rows=10000, cols=len(header))
                         wks.update_values(f'A1:{letter}1', [header])
                         wks.frozen_rows = 1
                     
-                    # 準備數據
+                    # 準備數據 - 使用標籤名稱對應 region_data 的 key
                     rows = len(wks.get_col(1, include_tailing_empty=False)) + 1
-                    data_row = [datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')]
+                    data_row = [datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
                     
-                    for tag_address in self.plc_tag.get(region, {}).values():
-                        data_row.append(region_data.get(tag_address, ''))
+                    for tag_name in self.plc_tag.get(region, {}).keys():
+                        data_row.append(region_data.get(tag_name, ''))
                     
-                    # 寫入數據
                     last_col = string.ascii_uppercase[min(len(self.plc_tag.get(region, {})) + 1, 26)]
                     wks.update_values(f'A{rows}:{last_col}{rows}', [data_row])
+                    success_count += 1
                 except Exception as e:
                     print(f"寫入 {region} 到 Google Sheet 失敗：{e}")
+            
+            print(f"Google Sheets 寫入成功：{success_count}/{len(data)} 個區域")
         except Exception as e:
             print(f"寫入 Google Sheet 失敗：{e}")
     
@@ -343,24 +345,28 @@ def plc_data_updater():
     """背景任務：定期更新 PLC 數據"""
     global running, plc_data_cache
     
+    last_write_time = 0  # 上次寫入時間戳記
+    
     while running:
         try:
             if plc_reader:
                 data = plc_reader.get_all_plc_data()
-                # 發送 SocketIO 事件
+                # 每 5 秒更新即時顯示
                 socketio.emit('plc_update', data)
                 
-                # 寫入資料庫（如果啟用）
-                if plc_reader.sql_enabled:
-                    plc_reader.write_to_sql(data)
-                
-                # 寫入 Google Sheets（如果啟用）
-                if plc_reader.gs_enabled:
-                    plc_reader.write_to_google_sheet(data)
+                # 依 write_interval 頻率寫入資料庫與 Google Sheets
+                current_time = time.time()
+                write_interval = plc_reader.write_interval if plc_reader else 300
+                if current_time - last_write_time >= write_interval:
+                    if plc_reader.sql_enabled:
+                        plc_reader.write_to_sql(data)
+                    if plc_reader.gs_enabled:
+                        plc_reader.write_to_google_sheet(data)
+                    last_write_time = current_time
         except Exception as e:
             print(f"更新 PLC 數據時發生錯誤：{e}")
         
-        time.sleep(5)  # 每 5 秒更新一次
+        time.sleep(5)  # 每 5 秒讀取 PLC 更新即時顯示
 
 @app.route('/')
 def index():
@@ -551,9 +557,25 @@ def settings():
     """設定頁面"""
     settings = load_settings()
     return render_template('settings.html',
+                         general_config=settings.get('general', {}),
                          plc_config=settings.get('plc', {}),
                          db_config=settings.get('database', {}),
                          gs_config=settings.get('google_sheets', {}))
+
+@app.route('/api/settings/general', methods=['POST'])
+def api_settings_general():
+    """API: 儲存一般設定"""
+    try:
+        settings = load_settings()
+        settings['general'] = request.get_json()
+        if save_settings(settings):
+            # 即時更新 write_interval 不需重啟
+            if plc_reader:
+                plc_reader.write_interval = settings['general'].get('write_interval', 300)
+            return jsonify({'status': 'success', 'message': '一般設定已儲存'})
+        return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/settings/plc', methods=['POST'])
 def api_settings_plc():
