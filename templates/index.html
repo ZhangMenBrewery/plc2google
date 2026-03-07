@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}首頁 - 釀造生產 PLC 監控系統{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-3"><i class="fas fa-tachometer-alt"></i> 儀表板總覽</h2>
+        <p class="text-muted">即時監控所有釀造區域的 PLC 數據</p>
+    </div>
+</div>
+
+<!-- 區域選擇器 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-filter"></i> 選擇區域
+            </div>
+            <div class="card-body">
+                <div class="btn-group flex-wrap" role="group" id="regionFilter">
+                    <button type="button" class="btn btn-outline-primary active" data-region="all">全部</button>
+                    {% for region in regions %}
+                    <button type="button" class="btn btn-outline-primary" data-region="{{ region }}">{{ region }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 數據卡片網格 -->
+<div class="region-grid" id="dataGrid">
+    <!-- 卡片將由 JavaScript 動態生成 -->
+</div>
+
+<!-- 圖表區域 -->
+<div class="row mt-4" id="chartSection" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-line"></i> 歷史趨勢
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 全域變數
+let socket;
+let plcData = {};
+let charts = {};
+let selectedRegion = 'all';
+
+// 區域標籤定義
+const regionLabels = {
+    'Hot Water': '熱水',
+    'Mash/Lauter': '糖化/過濾',
+    'Wort Kettle': '煮沸桶',
+    'Ice Water': '冰水',
+    'Glycol#1': '冷凍水 #1',
+    'Glycol#2': '冷凍水 #2',
+    'FV#1': '發酵桶 #1',
+    'FV#2': '發酵桶 #2',
+    'FV#3': '發酵桶 #3',
+    'FV#4': '發酵桶 #4',
+    'FV#5': '發酵桶 #5',
+    'FV#6': '發酵桶 #6',
+    'FV#7': '發酵桶 #7',
+    'FV#8': '發酵桶 #8',
+    'FV#9': '發酵桶 #9',
+    'FV#10': '發酵桶 #10',
+    'FV#11': '發酵桶 #11',
+    'FV#12': '發酵桶 #12',
+    'FV#13': '發酵桶 #13',
+    'FV#14': '發酵桶 #14',
+    'FV#15': '發酵桶 #15',
+    'FV#16': '發酵桶 #16',
+    'FV#17': '發酵桶 #17',
+    'FV#18': '發酵桶 #18',
+    'FV#19': '發酵桶 #19',
+    'FV#20': '發酵桶 #20',
+    'FV#21': '發酵桶 #21',
+    'FV#22': '發酵桶 #22'
+};
+
+// 標籤單位定義
+const tagUnits = {
+    'Temperature': '°C',
+    'Setpoint': '°C',
+    'Valve': '',
+    'Valve1': '',
+    'Valve2': '',
+    'Valve3': '',
+    'Pump': '',
+    'Pump Speed': 'rpm',
+    'Agitator': '',
+    'Agitator Speed': 'rpm',
+    'Volume': 'L',
+    'Flow': 'L/min',
+    'Flow Meter': 'L',
+    'Flow Volume': 'L',
+    'Chimney Temperature': '°C',
+    'Chimney Valve': '',
+    'Glycol': '°C',
+    'PSI': 'PSI',
+    'PSI_SP': 'PSI',
+    'CO2VOL': 'vol',
+    'CO2VOL_SP': 'vol',
+    'Cooler1': '',
+    'Cooler2': '',
+    'Cooler3': '',
+    'Cooler3 Power': ''
+};
+
+// 初始化 Socket.IO 連接
+function initSocket() {
+    socket = io();
+    
+    socket.on('connect', function() {
+        console.log('已連接到伺服器');
+        document.getElementById('connectionStatus').className = 'status-indicator status-connected';
+        document.getElementById('connectionText').textContent = '已連接';
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('與伺服器斷開連接');
+        document.getElementById('connectionStatus').className = 'status-indicator status-disconnected';
+        document.getElementById('connectionText').textContent = '已斷開';
+    });
+    
+    socket.on('plc_update', function(data) {
+        console.log('收到 PLC 更新:', data);
+        updateData(data);
+    });
+    
+    socket.on('connected', function(data) {
+        console.log('伺服器確認:', data);
+    });
+}
+
+// 更新數據
+function updateData(data) {
+    plcData = data;
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-TW');
+    renderCards(data);
+    
+    // 更新圖表
+    if (selectedRegion !== 'all' && data[selectedRegion]) {
+        updateChart(selectedRegion, data[selectedRegion]);
+    }
+}
+
+// 渲染卡片
+function renderCards(data) {
+    const grid = document.getElementById('dataGrid');
+    grid.innerHTML = '';
+    
+    for (const [region, regionData] of Object.entries(data)) {
+        if (selectedRegion !== 'all' && region !== selectedRegion) continue;
+        
+        const card = document.createElement('div');
+        card.className = 'card region-card';
+        card.setAttribute('data-region', region);
+        
+        let content = `
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-industry"></i> ${regionLabels[region] || region}</span>
+                <small>${regionData.timestamp ? new Date(regionData.timestamp).toLocaleTimeString('zh-TW') : ''}</small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+        `;
+        
+        for (const [tag, value] of Object.entries(regionData)) {
+            if (tag === 'timestamp') continue;
+            
+            const unit = tagUnits[tag] || '';
+            const displayValue = typeof value === 'number' ? value.toFixed(2) : value;
+            
+            // 根據標籤類型設定顏色
+            let badgeClass = 'bg-secondary';
+            if (tag.includes('Temperature')) badgeClass = 'badge-temp';
+            else if (tag.includes('PSI') || tag.includes('Pressure')) badgeClass = 'badge-pressure';
+            else if (tag.includes('Valve') || tag.includes('Pump') || tag.includes('Agitator')) {
+                badgeClass = value == 1 ? 'bg-success' : 'bg-danger';
+            }
+            
+            content += `
+                <div class="col-md-6 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="data-label">${tag}</span>
+                        <span class="badge ${badgeClass}">${displayValue} ${unit}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        content += `
+                </div>
+                <div class="text-center mt-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="showChart('${region}')">
+                        <i class="fas fa-chart-line"></i> 查看趨勢
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        card.innerHTML = content;
+        grid.appendChild(card);
+    }
+}
+
+// 顯示圖表
+function showChart(region) {
+    selectedRegion = region;
+    document.getElementById('chartSection').style.display = 'row';
+    
+    // 滾動到圖表區域
+    document.getElementById('chartSection').scrollIntoView({ behavior: 'smooth' });
+    
+    // 獲取歷史數據並更新圖表
+    fetch(`/api/history/${encodeURIComponent(region)}`)
+        .then(response => response.json())
+        .then(data => {
+            updateChart(region, data);
+        })
+        .catch(error => console.error('獲取歷史數據失敗:', error));
+}
+
+// 更新圖表
+function updateChart(region, data) {
+    const ctx = document.getElementById('historyChart').getContext('2d');
+    
+    // 準備數據
+    let labels = [];
+    let datasets = [];
+    
+    if (data.data) {
+        // 從 API 返回的歷史數據
+        labels = data.data.map(item => {
+            const date = new Date(item.timestamp);
+            return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }).reverse();
+        
+        // 為每個數值欄位創建數據集
+        const numericFields = ['temperature', 'setpoint', 'valve1', 'valve2', 'pump', 'pumpspeed', 'agitator', 'PSI', 'CO2VOL'];
+        
+        const colors = [
+            'rgba(231, 76, 60, 0.7)',
+            'rgba(52, 152, 219, 0.7)',
+            'rgba(46, 204, 113, 0.7)',
+            'rgba(241, 196, 15, 0.7)',
+            'rgba(155, 89, 182, 0.7)',
+            'rgba(230, 126, 34, 0.7)'
+        ];
+        
+        let colorIndex = 0;
+        for (const field of numericFields) {
+            if (data.data.some(item => item[field] !== null && item[field] !== undefined)) {
+                datasets.push({
+                    label: field,
+                    data: data.data.map(item => item[field]).reverse(),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length],
+                    fill: false,
+                    tension: 0.4
+                });
+                colorIndex++;
+            }
+        }
+    } else if (data.timestamp) {
+        // 從即時數據
+        labels = [new Date(data.timestamp).toLocaleTimeString('zh-TW')];
+        
+        const colors = [
+            'rgba(231, 76, 60, 0.7)',
+            'rgba(52, 152, 219, 0.7)',
+            'rgba(46, 204, 113, 0.7)'
+        ];
+        
+        let colorIndex = 0;
+        for (const [key, value] of Object.entries(data)) {
+            if (key !== 'timestamp' && typeof value === 'number') {
+                datasets.push({
+                    label: key,
+                    data: [value],
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length],
+                    fill: false,
+                    tension: 0.4
+                });
+                colorIndex++;
+            }
+        }
+    }
+    
+    // 如果圖表已存在，先銷毀
+    if (charts[region]) {
+        charts[region].destroy();
+    }
+    
+    // 創建新圖表
+    charts[region] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${regionLabels[region] || region} - 歷史趨勢`
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: '時間'
+                    }
+                },
+                y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: '數值'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 區域篩選
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化 Socket 連接
+    initSocket();
+    
+    // 區域篩選按鈕事件
+    const filterButtons = document.querySelectorAll('#regionFilter button');
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            selectedRegion = this.getAttribute('data-region');
+            
+            if (selectedRegion === 'all') {
+                // 重新獲取所有數據
+                fetch('/api/plc/data')
+                    .then(response => response.json())
+                    .then(data => updateData(data))
+                    .catch(error => console.error('獲取數據失敗:', error));
+            } else {
+                // 獲取特定區域數據
+                fetch(`/api/plc/region/${selectedRegion}`)
+                    .then(response => response.json())
+                    .then(data => updateData({ [selectedRegion]: data }))
+                    .catch(error => console.error('獲取數據失敗:', error));
+            }
+        });
+    });
+    
+    // 初始加載所有數據
+    fetch('/api/plc/data')
+        .then(response => response.json())
+        .then(data => updateData(data))
+        .catch(error => console.error('初始加載失敗:', error));
+});
+</script>
+{% endblock %}

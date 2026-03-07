@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}警報管理 - 釀造生產 PLC 監控系統{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2><i class="fas fa-bell"></i> 警報管理</h2>
+        <p class="text-muted">監控系統警報與異常通知</p>
+    </div>
+</div>
+
+<!-- 警報統計 -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-exclamation-triangle"></i> 當前警報</h5>
+                <h2 id="activeAlerts">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-clock"></i> 今日警報</h5>
+                <h2 id="todayAlerts">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-history"></i> 總警報數</h5>
+                <h2 id="totalAlerts">0</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 警報過濾 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-filter"></i> 警報過濾
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">區域</label>
+                        <select class="form-select" id="alertRegionFilter">
+                            <option value="all">全部</option>
+                            {% for region in regions %}
+                            <option value="{{ region }}">{{ region }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">警報類型</label>
+                        <select class="form-select" id="alertTypeFilter">
+                            <option value="all">全部</option>
+                            <option value="temperature">溫度異常</option>
+                            <option value="pressure">壓力異常</option>
+                            <option value="equipment">設備狀態</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary w-100" onclick="refreshAlerts()">
+                            <i class="fas fa-sync-alt"></i> 刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 警報列表 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list"></i> 警報列表
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="alertsTable">
+                        <thead>
+                            <tr>
+                                <th>時間</th>
+                                <th>區域</th>
+                                <th>警報類型</th>
+                                <th>訊息</th>
+                                <th>狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <div class="loading-spinner"></div> 載入中...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 即時監控狀態 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-video"></i> 即時監控狀態
+            </div>
+            <div class="card-body">
+                <div class="row" id="monitoringStatus">
+                    <!-- 將由 JavaScript 動態生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 警報數據
+let alertsData = [];
+
+// 警報類型映射
+const alertTypeMap = {
+    'temperature': '溫度異常',
+    'pressure': '壓力異常',
+    'equipment': '設備狀態',
+    'default': '一般警報'
+};
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    refreshAlerts();
+    updateMonitoringStatus();
+    
+    // 定期刷新
+    setInterval(refreshAlerts, 30000);
+    setInterval(updateMonitoringStatus, 30000);
+});
+
+// 刷新警報
+function refreshAlerts() {
+    // 這裡可以連接警報 API
+    // 目前使用模擬數據
+    alertsData = generateMockAlerts();
+    renderAlertsTable(alertsData);
+    updateAlertStats(alertsData);
+}
+
+// 生成模擬警報數據
+function generateMockAlerts() {
+    const mockAlerts = [
+        {
+            id: 1,
+            timestamp: new Date().toISOString(),
+            region: 'FV#1',
+            type: 'temperature',
+            message: 'FV#1 溫度：25°C 超過設定值 20°C',
+            status: 'active'
+        },
+        {
+            id: 2,
+            timestamp: new Date(Date.now() - 3600000).toISOString(),
+            region: 'Glycol#2',
+            type: 'equipment',
+            message: 'Glycol#2 電源已關閉',
+            status: 'resolved'
+        },
+        {
+            id: 3,
+            timestamp: new Date(Date.now() - 7200000).toISOString(),
+            region: 'Wort Kettle',
+            type: 'temperature',
+            message: 'Wort Kettle 溫度偏差超過 1°C',
+            status: 'resolved'
+        }
+    ];
+    return mockAlerts;
+}
+
+// 渲染警報表格
+function renderAlertsTable(alerts) {
+    const tbody = document.getElementById('alertsTableBody');
+    
+    if (alerts.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted">
+                    <i class="fas fa-check-circle"></i> 目前沒有警報
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = alerts.map(alert => {
+        const date = new Date(alert.timestamp);
+        const statusClass = alert.status === 'active' ? 'badge-danger' : 'badge-success';
+        const statusText = alert.status === 'active' ? '未解決' : '已解決';
+        
+        return `
+            <tr>
+                <td>${date.toLocaleString('zh-TW')}</td>
+                <td>${alert.region}</td>
+                <td>${alertTypeMap[alert.type] || alertTypeMap.default}</td>
+                <td>${alert.message}</td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 更新警報統計
+function updateAlertStats(alerts) {
+    document.getElementById('activeAlerts').textContent = alerts.filter(a => a.status === 'active').length;
+    document.getElementById('todayAlerts').textContent = alerts.filter(a => {
+        const today = new Date();
+        const alertDate = new Date(a.timestamp);
+        return alertDate.toDateString() === today.toDateString();
+    }).length;
+    document.getElementById('totalAlerts').textContent = alerts.length;
+}
+
+// 更新監控狀態
+function updateMonitoringStatus() {
+    fetch('/api/plc/data')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('monitoringStatus');
+            container.innerHTML = '';
+            
+            for (const [region, regionData] of Object.entries(data)) {
+                const col = document.createElement('div');
+                col.className = 'col-md-4 mb-3';
+                
+                // 檢查是否有異常
+                let statusIcon = 'fa-check-circle';
+                let statusClass = 'text-success';
+                
+                if (region.startsWith('FV')) {
+                    const temp = regionData.temperature;
+                    const setpoint = regionData.setpoint;
+                    if (temp && setpoint && Math.abs(temp - setpoint) > 1) {
+                        statusIcon = 'fa-exclamation-circle';
+                        statusClass = 'text-danger';
+                    }
+                }
+                
+                col.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas ${statusIcon} ${statusClass} me-2"></i>
+                        <span>${region}</span>
+                        <small class="text-muted ms-2">${regionData.timestamp ? new Date(regionData.timestamp).toLocaleTimeString() : ''}</small>
+                    </div>
+                `;
+                
+                container.appendChild(col);
+            }
+        })
+        .catch(error => console.error('獲取監控狀態失敗:', error));
+}
+</script>
+{% endblock %}
