@@ -1,0 +1,325 @@
+insert into public.plc_fv1
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv1;
+
+insert into public.plc_fv2
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv2;
+
+insert into public.plc_fv3
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv3;
+
+insert into public.plc_fv4
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv4;
+
+insert into public.plc_fv5
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv5;
+
+insert into public.plc_fv6
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv6;
+
+insert into public.plc_fv7
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv7;
+
+insert into public.plc_fv8
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv8;
+
+insert into public.plc_fv9
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv9;
+
+insert into public.plc_fv10
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv10;
+
+insert into public.plc_fv11
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv11;
+
+insert into public.plc_fv12
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv12;
+
+insert into public.plc_fv13
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv13;
+
+insert into public.plc_fv14
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv14;
+
+insert into public.plc_fv15
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv15;
+
+insert into public.plc_fv16
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2
+from zmb.plc_fv16;
+
+insert into public.plc_fv17
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	psi,
+	psi_sp,
+	co2vol,
+	co2vol_sp,
+	case when valve3 then 1 else 0 end as valve3
+from zmb.plc_fv17;
+
+insert into public.plc_fv18
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	psi,
+	psi_sp,
+	co2vol,
+	co2vol_sp,
+	case when valve3 then 1 else 0 end as valve3
+from zmb.plc_fv18;
+
+insert into public.plc_fv19
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	psi,
+	psi_sp,
+	co2vol,
+	co2vol_sp,
+	case when valve3 then 1 else 0 end as valve3
+from zmb.plc_fv19;
+
+insert into public.plc_fv20
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	psi,
+	psi_sp,
+	co2vol,
+	co2vol_sp,
+	case when valve3 then 1 else 0 end as valve3
+from zmb.plc_fv20;
+
+insert into public.plc_fv21
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	psi,
+	psi_sp,
+	co2vol,
+	co2vol_sp,
+	case when valve3 then 1 else 0 end as valve3
+from zmb.plc_fv21;
+
+insert into public.plc_fv22
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	psi,
+	psi_sp,
+	co2vol,
+	co2vol_sp,
+	case when valve3 then 1 else 0 end as valve3
+from zmb.plc_fv22;
+
+insert into public.plc_glycol1
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when cooler1 then 1 else 0 end as cooler1,
+	case when cooler2 then 1 else 0 end as cooler2,
+	case when pump then 1 else 0 end as pump
+from zmb.plc_glycol1;
+
+insert into public.plc_glycol2
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when cooler1 then 1 else 0 end as cooler1,
+	case when cooler2 then 1 else 0 end as cooler2,
+	case when pump then 1 else 0 end as pump
+from zmb.plc_glycol2;
+
+insert into public.plc_hotwater
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve then 1 else 0 end as valve,
+	volume,
+	case when pump then 1 else 0 end as pump,
+	flowvolume
+from zmb.plc_hotwater;
+
+insert into public.plc_icewater
+select
+	id,
+	timestamp,
+	volume,
+	case when pump then 1 else 0 end as pump
+from zmb.plc_icewater;
+
+insert into public.plc_mashlauter
+select
+	id,
+	timestamp,
+	temperature,
+	setpoint::numeric(5,2),
+	case when valve then 1 else 0 end as valve,
+	case when pump then 1 else 0 end as pump,
+	pumpspeed,
+	case when agitator then 1 else 0 end as agitator,
+	agitatorspeed,
+	flowmeter
+from zmb.plc_mashlauter;
+
+insert into public.plc_wortkettle
+select
+	id,
+	timestamp,
+	temperature,
+	case
+		when setpoint > 999 then 999.99
+		when setpoint < -999 then -999.99
+		else setpoint::numeric(5,2)
+	end,
+	case when valve1 then 1 else 0 end as valve1,
+	case when valve2 then 1 else 0 end as valve2,
+	chimneytemerature,
+	case when chimneyvalve then 1 else 0 end as chimneyvalve,
+	case when pump then 1 else 0 end as pump,
+	pumpspeed,
+	flowmeter,
+	flowvolume
+from zmb.plc_wortkettle;

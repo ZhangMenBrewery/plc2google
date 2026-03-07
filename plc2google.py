@@ -1,6 +1,5 @@
-from urllib import request
-import mysql.connector
-from mysql.connector import Error
+import psycopg2
+from psycopg2 import OperationalError
 import pygsheets
 import time
 import datetime
@@ -10,7 +9,6 @@ import string
 import os
 import requests
 
-
 class zmb_plc():
     def __init__(self) -> None:
         self.__gs_key = 'zmb54685508-c88132768091.json'
@@ -19,11 +17,15 @@ class zmb_plc():
             'zhangmenbrewery@gmail.com', 'chunkai721@gmail.com']
         self.__plc_tag = {}
 
-        self.__sql_host = 'localhost'
+        self.__sql_host = '192.168.60.12'
         self.__sql_user = 'zhangmen'
         self.__sql_password = '54685508'
+        self.__sql_database = 'zmb'  # 指定要連接的PostgreSQL數據庫名稱
+        path_create = 'sql_create.json'
+        with open(path_create, encoding='utf-8', errors='ignore') as f:
+            self.__sql_create_commands = json.load(f, strict=False)
         path = 'sql_insert.json'
-        with open(path,encoding='utf-8', errors='ignore') as f:
+        with open(path, encoding='utf-8', errors='ignore') as f:
             self.__sql_insert_tag = json.load(f, strict=False)
 
     # ss mean spreadsheet
@@ -94,20 +96,39 @@ class zmb_plc():
                     pass
             wks.update_values(f"A{rows}:{dict(zip(range(1,27),string.ascii_uppercase))[len(self.__plc_tag[item])+1]}{rows}", [data, ])    
 
-    #建立sql連線
+    # 建立sql連線
     def connect_db(self, db):
         connection = None
         try:
-            connection = mysql.connector.connect(
+            connection = psycopg2.connect(
                 host=self.__sql_host,
                 user=self.__sql_user,
-                passwd=self.__sql_password,
-                database=db
+                password=self.__sql_password,
+                dbname=self.__sql_database
             )
-            print("Connection to MySQL DB successful")
-        except Error as e:
-            print(f"The error '{e}' occurred")
+            print("連接到PostgreSQL數據庫成功")
+        except OperationalError as e:
+            print(f"發生錯誤 '{e}'")
         return connection
+
+    def check_and_create_tables(self):
+        """檢查資料庫中是否存在指定的資料表，如果不存在，則創建資料表"""
+        connection = self.connect_db(self.__sql_database)
+        cursor = connection.cursor()
+
+        for table_name, creation_command in self.__sql_create_commands.items():
+            cursor.execute(f"SELECT to_regclass('{table_name.lower()}');")
+            exists = cursor.fetchone()[0]
+            if not exists:
+                print(f"Creating table {table_name}...")
+                cursor.execute(creation_command)
+                connection.commit()
+                print(f"Table {table_name} created successfully.")
+            else:
+                print(f"Table {table_name} already exists.")
+
+        cursor.close()
+        connection.close()
 
     def write_to_sheet_sql(self,ss):
         client = snap7.client.Client()
@@ -118,7 +139,7 @@ class zmb_plc():
     #    plc_do = client.ab_read(0 ,11)
     #    print(snap7.util.get_bool(plc_do, 10, 5))
 
-        conn = self.connect_db("zmb")
+        conn = self.connect_db(self.__sql_database)
         cur = conn.cursor()
 
         for item in self.__plc_tag.keys():
@@ -206,20 +227,19 @@ def lineNotifyMessage(token, msg, img=None):
         files['imageFile'].close()
     return r.status_code
 
-
-
 def main():
-        while True:
-            try:
-                plc_obj = zmb_plc()
-                ss_obj = plc_obj.open_ss()
-                plc_obj.write_to_sheet_sql(ss_obj)
-                beername()
-            except Exception as error:
-                print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > {error} ")
-                time.sleep(60)
-            print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > Sleeping 300sec")
-            time.sleep(300)
+    while True:
+        try:
+            plc_obj = zmb_plc()
+            plc_obj.check_and_create_tables()  # 檢查並創建資料表
+            ss_obj = plc_obj.open_ss()
+            plc_obj.write_to_sheet_sql(ss_obj)
+            beername()
+        except Exception as error:
+            print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > {error} ")
+            time.sleep(60)
+        print(f"{time.strftime('%m/%d/%Y %H:%M:%S', time.localtime())} > 休眠300秒")
+        time.sleep(300)
 
 if __name__ == '__main__':
     main()
