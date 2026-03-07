@@ -23,21 +23,61 @@ plc_data_cache = {}
 data_lock = Lock()
 running = True
 
+# 設定檔案路徑
+SETTINGS_FILE = 'settings.json'
+
+def load_settings():
+    """載入設定檔案"""
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"載入設定失敗：{e}")
+    return {}
+
+def save_settings(settings):
+    """儲存設定檔案"""
+    try:
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+        return True
+    except Exception as e:
+        print(f"儲存設定失敗：{e}")
+        return False
+
 class ZMBPlcReader:
     """PLC 數據讀取類別"""
     
     def __init__(self):
-        self.gs_key = 'zmb54685508-c88132768091.json'
-        self.sql_host = '192.168.60.12'
-        self.sql_user = 'zhangmen'
-        self.sql_password = '54685508'
-        self.sql_database = 'zmb'
-        self.plc_ip = "192.168.60.201"
-        self.plc_rack = 0
-        self.plc_slot = 2
+        # 從設定檔案載入配置
+        settings = load_settings()
+        
+        # Google Sheets 設定
+        gs_config = settings.get('google_sheets', {})
+        self.gs_key = gs_config.get('gs_key', 'zmb54685508-c88132768091.json')
+        self.gs_title = 'ZMB-' + str(datetime.date.today())[:-3]
+        self.gs_enabled = gs_config.get('enabled', False)
+        
+        # 資料庫設定
+        db_config = settings.get('database', {})
+        self.sql_host = db_config.get('db_host', '192.168.60.12')
+        self.sql_user = db_config.get('db_user', 'zhangmen')
+        self.sql_password = db_config.get('db_password', '54685508')
+        self.sql_database = db_config.get('db_database', 'zmb')
+        self.sql_enabled = db_config.get('enabled', False)
+        
+        # PLC 設定
+        plc_config = settings.get('plc', {})
+        self.plc_ip = plc_config.get('plc_ip', "192.168.60.201")
+        self.plc_rack = plc_config.get('plc_rack', 0)
+        self.plc_slot = plc_config.get('plc_slot', 2)
         
         # 載入 PLC 標籤配置
         self.load_plc_tags()
+        
+        # 載入 SQL 配置
+        self.load_sql_config()
         
         # 初始化 PLC 客戶端
         self.client = snap7.client.Client()
@@ -47,6 +87,131 @@ class ZMBPlcReader:
         except Exception as e:
             print(f"連接 PLC 失敗：{e}")
     
+    def load_sql_config(self):
+        """載入 SQL 配置"""
+        try:
+            # 載入 SQL 建立命令
+            path_create = 'sql_create.json'
+            if os.path.exists(path_create):
+                with open(path_create, encoding='utf-8', errors='ignore') as f:
+                    self.sql_create_commands = json.load(f, strict=False)
+            else:
+                self.sql_create_commands = {}
+            
+            # 載入 SQL 插入命令
+            path = 'sql_insert.json'
+            if os.path.exists(path):
+                with open(path, encoding='utf-8', errors='ignore') as f:
+                    self.sql_insert_tag = json.load(f, strict=False)
+            else:
+                self.sql_insert_tag = {}
+        except Exception as e:
+            print(f"載入 SQL 配置失敗：{e}")
+            self.sql_create_commands = {}
+            self.sql_insert_tag = {}
+    
+    def write_to_sql(self, data):
+        """將數據寫入資料庫"""
+        if not self.sql_enabled:
+            return
+        
+        try:
+            conn = psycopg2.connect(
+                host=self.sql_host,
+                user=self.sql_user,
+                password=self.sql_password,
+                dbname=self.sql_database
+            )
+            cur = conn.cursor()
+            
+            for region, region_data in data.items():
+                table_name = region_to_table(region)
+                if not table_name:
+                    continue
+                
+                # 建立資料表（如果不存在）
+                if region in self.sql_create_commands:
+                    cur.execute(self.sql_create_commands[region])
+                
+                # 準備插入數據
+                timestamp = region_data.get('timestamp', datetime.datetime.now())
+                tags = self.plc_tag.get(region, {})
+                
+                # 動態建立 INSERT 語句
+                columns = ['timestamp']
+                values = [timestamp]
+                
+                for tag_name in tags.keys():
+                    if tag_name in region_data and tag_name != 'timestamp':
+                        columns.append(tag_name.lower())
+                        values.append(region_data[tag_name])
+                
+                # 建立 SQL 語句
+                placeholders = ','.join(['%s'] * len(values))
+                col_names = ','.join(columns)
+                sql = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
+                
+                try:
+                    cur.execute(sql, values)
+                except Exception as e:
+                    # 如果失敗，嘗試簡化版本
+                    sql = f"INSERT INTO {table_name} (timestamp, temperature, setpoint, valve1, valve2) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+                    cur.execute(sql, [
+                        timestamp,
+                        region_data.get('Temperature', 0),
+                        region_data.get('Setpoint', 0),
+                        region_data.get('Valve1', 0),
+                        region_data.get('Valve2', 0)
+                    ])
+            
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f"寫入資料庫失敗：{e}")
+    
+    def write_to_google_sheet(self, data):
+        """將數據寫入 Google Sheets"""
+        if not self.gs_enabled:
+            return
+        
+        try:
+            gc = pygsheets.authorize(service_account_file=self.gs_key)
+            
+            try:
+                ss = gc.open(self.gs_title)
+            except pygsheets.SpreadsheetNotFound:
+                # 建立新的 Google Sheet
+                ss = gc.sheet.create(self.gs_title)
+                # 分享給相關人員
+                ss.share('', role='reader', type='anyone')
+            
+            for region, region_data in data.items():
+                try:
+                    wks = ss.worksheet_by_title(region)
+                    if not wks:
+                        # 如果工作表不存在，建立它
+                        letter = string.ascii_uppercase[len(self.plc_tag.get(region, {})) + 1] if len(self.plc_tag.get(region, {})) < 26 else 'A'
+                        header = ['Time'] + list(self.plc_tag.get(region, {}).keys())
+                        wks = ss.add_worksheet(title=region, rows=10000, cols=len(header))
+                        wks.update_values(f'A1:{letter}1', [header])
+                        wks.frozen_rows = 1
+                    
+                    # 準備數據
+                    rows = len(wks.get_col(1, include_tailing_empty=False)) + 1
+                    data_row = [datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')]
+                    
+                    for tag_address in self.plc_tag.get(region, {}).values():
+                        data_row.append(region_data.get(tag_address, ''))
+                    
+                    # 寫入數據
+                    last_col = string.ascii_uppercase[min(len(self.plc_tag.get(region, {})) + 1, 26)]
+                    wks.update_values(f'A{rows}:{last_col}{rows}', [data_row])
+                except Exception as e:
+                    print(f"寫入 {region} 到 Google Sheet 失敗：{e}")
+        except Exception as e:
+            print(f"寫入 Google Sheet 失敗：{e}")
+    
     def load_plc_tags(self):
         """載入 PLC 標籤配置"""
         try:
@@ -55,6 +220,15 @@ class ZMBPlcReader:
         except Exception as e:
             print(f"載入 PLC 標籤失敗：{e}")
             self.plc_tag = {}
+        
+        # 載入區域順序配置
+        try:
+            with open('region_order.json', encoding='utf-8', errors='ignore') as f:
+                order_data = json.load(f, strict=False)
+                self.region_order = order_data.get('order', [])
+        except Exception as e:
+            print(f"載入區域順序失敗：{e}")
+            self.region_order = []
     
     def read_plc_value(self, tag):
         """從 PLC 讀取單一標籤的值"""
@@ -101,18 +275,40 @@ class ZMBPlcReader:
         """讀取所有 PLC 數據"""
         global plc_data_cache
         
+        from collections import OrderedDict
+        
         with data_lock:
-            data = {}
+            # 使用 OrderedDict 保持順序
+            data = OrderedDict()
             
-            for region, tags in self.plc_tag.items():
-                region_data = {"timestamp": datetime.datetime.now().isoformat()}
+            # 按照 region_order 中的順序排列
+            regions_to_process = self.region_order if self.region_order else sorted(self.plc_tag.keys())
+            
+            for region in regions_to_process:
+                if region not in self.plc_tag:
+                    continue
+                tags = self.plc_tag[region]
+                region_data = OrderedDict()
+                region_data["timestamp"] = datetime.datetime.now().isoformat()
                 
+                # 按照標籤在 plc_tag.json 中的順序
                 for tag_name, tag_address in tags.items():
                     value = self.read_plc_value(tag_address)
                     if value is not None:
                         region_data[tag_name] = value
                 
                 data[region] = region_data
+            
+            # 處理未在 region_order 中但存在的區域
+            for region in self.plc_tag:
+                if region not in data:
+                    region_data = OrderedDict()
+                    region_data["timestamp"] = datetime.datetime.now().isoformat()
+                    for tag_name, tag_address in self.plc_tag[region].items():
+                        value = self.read_plc_value(tag_address)
+                        if value is not None:
+                            region_data[tag_name] = value
+                    data[region] = region_data
             
             plc_data_cache = data
             return data
@@ -153,6 +349,14 @@ def plc_data_updater():
                 data = plc_reader.get_all_plc_data()
                 # 發送 SocketIO 事件
                 socketio.emit('plc_update', data)
+                
+                # 寫入資料庫（如果啟用）
+                if plc_reader.sql_enabled:
+                    plc_reader.write_to_sql(data)
+                
+                # 寫入 Google Sheets（如果啟用）
+                if plc_reader.gs_enabled:
+                    plc_reader.write_to_google_sheet(data)
         except Exception as e:
             print(f"更新 PLC 數據時發生錯誤：{e}")
         
@@ -161,7 +365,16 @@ def plc_data_updater():
 @app.route('/')
 def index():
     """首頁"""
-    return render_template('index.html')
+    # 按照 region_order 或字母順序排列區域
+    if plc_reader:
+        if plc_reader.region_order:
+            regions = plc_reader.region_order
+        else:
+            # 按照字母順序排列
+            regions = sorted(plc_reader.plc_tag.keys())
+    else:
+        regions = []
+    return render_template('index.html', regions=regions)
 
 @app.route('/api/plc/status')
 def api_plc_status():
@@ -175,7 +388,8 @@ def api_plc_data():
     """API: 獲取所有 PLC 數據"""
     global plc_data_cache
     with data_lock:
-        return jsonify(plc_data_cache)
+        # 確保返回的是列表格式，保持順序
+        return jsonify(list(plc_data_cache.items()))
 
 @app.route('/api/plc/region/<region_name>')
 def api_plc_region(region_name):
@@ -186,13 +400,66 @@ def api_plc_region(region_name):
             return jsonify(plc_data_cache[region_name])
         return jsonify({"error": f"區域 {region_name} 不存在"}), 404
 
+@app.route('/api/plc-tags')
+def api_plc_tags():
+    """API: 獲取 PLC 標籤配置"""
+    global plc_tag
+    if plc_reader:
+        return jsonify(plc_reader.plc_tag)
+    return jsonify({})
+
+@app.route('/api/plc-tags', methods=['POST'])
+def api_save_plc_tags():
+    """API: 儲存 PLC 標籤配置"""
+    try:
+        new_tags = request.get_json()
+        if isinstance(new_tags, dict):
+            # 更新 plc_tag.json
+            with open('plc_tag.json', 'w', encoding='utf-8') as f:
+                json.dump(new_tags, f, ensure_ascii=False, indent=4)
+            # 更新 plc_reader 的標籤
+            if plc_reader:
+                plc_reader.plc_tag = new_tags
+                # 重新載入區域順序
+                plc_reader.load_plc_tags()
+            return jsonify({'status': 'success', 'message': 'PLC 標籤已更新'})
+        return jsonify({'status': 'error', 'message': '無效的請求格式'}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/regions')
 def api_regions():
     """API: 獲取所有可用區域列表"""
     global plc_tag
     if plc_reader:
+        # 返回按照順序的區域列表
+        if plc_reader.region_order:
+            return jsonify(plc_reader.region_order)
         return jsonify(list(plc_reader.plc_tag.keys()))
     return jsonify([])
+
+@app.route('/api/region-order', methods=['GET', 'POST'])
+def api_region_order():
+    """API: 獲取或更新區域順序"""
+    if request.method == 'POST':
+        try:
+            order = request.get_json()
+            if isinstance(order, list):
+                # 更新 region_order.json
+                with open('region_order.json', 'w', encoding='utf-8') as f:
+                    json.dump({'order': order}, f, ensure_ascii=False, indent=4)
+                # 更新 plc_reader 的順序
+                if plc_reader:
+                    plc_reader.region_order = order
+                return jsonify({'status': 'success', 'message': '區域順序已更新'})
+            return jsonify({'status': 'error', 'message': '無效的請求格式'}), 400
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+    else:
+        # 返回當前順序
+        if plc_reader and plc_reader.region_order:
+            return jsonify(plc_reader.region_order)
+        return jsonify(list(plc_reader.plc_tag.keys()) if plc_reader else [])
 
 @app.route('/api/history/<region_name>')
 def api_history(region_name):
@@ -207,18 +474,14 @@ def api_history(region_name):
         cur = conn.cursor()
         
         # 根據區域名稱映射到對應的資料表
-        table_mapping = {
-            'Hot Water': 'plc_hotwater',
-            'Mash/Lauter': 'plc_mashlauter',
-            'Wort Kettle': 'plc_wortkettle',
-            'Ice Water': 'plc_icewater',
-            'Glycol#1': 'plc_glycol1',
-            'Glycol#2': 'plc_glycol2',
-        }
+        table_mapping = {}
         
-        # FV 區域映射
-        for i in range(1, 23):
-            table_mapping[f'FV#{i}'] = f'plc_fv{i}'
+        # 從 plc_tag 動態建立映射
+        if plc_reader:
+            for region in plc_reader.plc_tag.keys():
+                table_name = region_to_table(region)
+                if table_name:
+                    table_mapping[region] = table_name
         
         table_name = table_mapping.get(region_name)
         
@@ -227,8 +490,8 @@ def api_history(region_name):
         
         # 查詢最近 100 筆記錄
         cur.execute(f"""
-            SELECT * FROM {table_name} 
-            ORDER BY timestamp DESC 
+            SELECT * FROM {table_name}
+            ORDER BY timestamp DESC
             LIMIT 100
         """)
         
@@ -255,11 +518,126 @@ def api_history(region_name):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def region_to_table(region):
+    """將區域名稱轉換為資料表名稱"""
+    # 特殊處理已知區域
+    special_mapping = {
+        'Hot Water': 'plc_hotwater',
+        'Mash/Lauter': 'plc_mashlauter',
+        'Wort Kettle': 'plc_wortkettle',
+        'Ice Water': 'plc_icewater',
+        'Glycol#1': 'plc_glycol1',
+        'Glycol#2': 'plc_glycol2',
+    }
+    
+    if region in special_mapping:
+        return special_mapping[region]
+    
+    # FV 區域映射
+    if region.startswith('FV#'):
+        fv_num = region.replace('FV#', '')
+        return f'plc_fv{fv_num}'
+    
+    return None
+
 @app.route('/alerts')
 def alerts():
     """警報頁面"""
     regions = list(plc_reader.plc_tag.keys()) if plc_reader else []
     return render_template('alerts.html', regions=regions)
+
+@app.route('/settings')
+def settings():
+    """設定頁面"""
+    settings = load_settings()
+    return render_template('settings.html',
+                         plc_config=settings.get('plc', {}),
+                         db_config=settings.get('database', {}),
+                         gs_config=settings.get('google_sheets', {}))
+
+@app.route('/api/settings/plc', methods=['POST'])
+def api_settings_plc():
+    """API: 儲存 PLC 設定"""
+    try:
+        settings = load_settings()
+        settings['plc'] = request.get_json()
+        if save_settings(settings):
+            return jsonify({'status': 'success', 'message': 'PLC 設定已儲存'})
+        return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/settings/database', methods=['POST'])
+def api_settings_database():
+    """API: 儲存資料庫設定"""
+    try:
+        settings = load_settings()
+        settings['database'] = request.get_json()
+        if save_settings(settings):
+            return jsonify({'status': 'success', 'message': '資料庫設定已儲存'})
+        return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/settings/google-sheets', methods=['POST'])
+def api_settings_google_sheets():
+    """API: 儲存 Google Sheets 設定"""
+    try:
+        settings = load_settings()
+        settings['google_sheets'] = request.get_json()
+        if save_settings(settings):
+            return jsonify({'status': 'success', 'message': 'Google Sheets 設定已儲存'})
+        return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/settings/test-plc')
+def api_test_plc():
+    """API: 測試 PLC 連接"""
+    try:
+        settings = load_settings()
+        plc_config = settings.get('plc', {})
+        plc_ip = plc_config.get('plc_ip', '192.168.60.201')
+        plc_rack = plc_config.get('plc_rack', 0)
+        plc_slot = plc_config.get('plc_slot', 2)
+        
+        test_client = snap7.client.Client()
+        test_client.connect(plc_ip, plc_rack, plc_slot)
+        
+        # 嘗試讀取 CPU 狀態
+        cpu_info = test_client.get_cpu_info()
+        test_client.disconnect()
+        
+        return jsonify({'status': 'success', 'message': f'成功連接到 {plc_ip}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/api/settings/test-database')
+def api_test_database():
+    """API: 測試資料庫連接"""
+    try:
+        settings = load_settings()
+        db_config = settings.get('database', {})
+        db_host = db_config.get('db_host', '192.168.60.12')
+        db_user = db_config.get('db_user', 'zhangmen')
+        db_password = db_config.get('db_password', '54685508')
+        db_database = db_config.get('db_database', 'zmb')
+        
+        conn = psycopg2.connect(
+            host=db_host,
+            user=db_user,
+            password=db_password,
+            dbname=db_database
+        )
+        cur = conn.cursor()
+        cur.execute('SELECT version();')
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        return jsonify({'status': 'success', 'message': f'成功連接到 {db_host}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 
 @socketio.on('connect')
 def handle_connect():

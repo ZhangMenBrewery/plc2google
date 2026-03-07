@@ -30,8 +30,35 @@
 </div>
 
 <!-- 數據卡片網格 -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-secondary" id="toggleEditBtn" onclick="toggleEditMode()">
+                <i class="fas fa-edit"></i> 編輯順序
+            </button>
+            <button type="button" class="btn btn-success" id="saveOrderBtn" onclick="saveRegionOrder()" style="display: none;">
+                <i class="fas fa-save"></i> 儲存順序
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="region-grid" id="dataGrid">
     <!-- 卡片將由 JavaScript 動態生成 -->
+</div>
+
+<!-- 拖曳排序容器 -->
+<div class="row mt-3" id="editOrderContainer" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <i class="fas fa-arrows-alt"></i> 拖曳區域卡片來調整順序
+            </div>
+            <div class="card-body" id="sortableContainer">
+                <!-- 可拖曳的區域按鈕 -->
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- 圖表區域 -->
@@ -52,12 +79,16 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- 引入 SortableJS 用於拖曳排序 -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 // 全域變數
 let socket;
 let plcData = {};
 let charts = {};
 let selectedRegion = 'all';
+let editMode = false;
+let sortableInstance = null;
 
 // 區域標籤定義
 const regionLabels = {
@@ -148,13 +179,23 @@ function initSocket() {
 
 // 更新數據
 function updateData(data) {
-    plcData = data;
+    // 處理 API 返回的數據格式（可能是列表或物件）
+    if (Array.isArray(data)) {
+        // 將列表轉換為物件
+        plcData = {};
+        data.forEach(([key, value]) => {
+            plcData[key] = value;
+        });
+    } else {
+        plcData = data;
+    }
+    
     document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-TW');
-    renderCards(data);
+    renderCards(plcData);
     
     // 更新圖表
-    if (selectedRegion !== 'all' && data[selectedRegion]) {
-        updateChart(selectedRegion, data[selectedRegion]);
+    if (selectedRegion !== 'all' && plcData[selectedRegion]) {
+        updateChart(selectedRegion, plcData[selectedRegion]);
     }
 }
 
@@ -163,7 +204,10 @@ function renderCards(data) {
     const grid = document.getElementById('dataGrid');
     grid.innerHTML = '';
     
-    for (const [region, regionData] of Object.entries(data)) {
+    // 確保按照正確的順序處理數據
+    const regions = Object.keys(data);
+    for (const region of regions) {
+        const regionData = data[region];
         if (selectedRegion !== 'all' && region !== selectedRegion) continue;
         
         const card = document.createElement('div');
@@ -232,7 +276,10 @@ function showChart(region) {
         .then(data => {
             updateChart(region, data);
         })
-        .catch(error => console.error('獲取歷史數據失敗:', error));
+        .catch(error => {
+            console.error('獲取歷史數據失敗:', error);
+            alert('獲取歷史數據失敗，請確認資料庫中是否有該區域的歷史數據');
+        });
 }
 
 // 更新圖表
@@ -243,15 +290,22 @@ function updateChart(region, data) {
     let labels = [];
     let datasets = [];
     
-    if (data.data) {
+    if (data.data && data.data.length > 0) {
         // 從 API 返回的歷史數據
         labels = data.data.map(item => {
             const date = new Date(item.timestamp);
             return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }).reverse();
         
-        // 為每個數值欄位創建數據集
-        const numericFields = ['temperature', 'setpoint', 'valve1', 'valve2', 'pump', 'pumpspeed', 'agitator', 'PSI', 'CO2VOL'];
+        // 獲取所有數值欄位
+        const numericFields = new Set();
+        data.data.forEach(item => {
+            Object.keys(item).forEach(key => {
+                if (key !== 'timestamp' && typeof item[key] === 'number') {
+                    numericFields.add(key);
+                }
+            });
+        });
         
         const colors = [
             'rgba(231, 76, 60, 0.7)',
@@ -259,15 +313,19 @@ function updateChart(region, data) {
             'rgba(46, 204, 113, 0.7)',
             'rgba(241, 196, 15, 0.7)',
             'rgba(155, 89, 182, 0.7)',
-            'rgba(230, 126, 34, 0.7)'
+            'rgba(230, 126, 34, 0.7)',
+            'rgba(39, 174, 96, 0.7)',
+            'rgba(142, 68, 173, 0.7)'
         ];
         
         let colorIndex = 0;
         for (const field of numericFields) {
-            if (data.data.some(item => item[field] !== null && item[field] !== undefined)) {
+            const fieldData = data.data.map(item => item[field]);
+            // 檢查是否有有效數據
+            if (fieldData.some(val => val !== null && val !== undefined)) {
                 datasets.push({
                     label: field,
-                    data: data.data.map(item => item[field]).reverse(),
+                    data: fieldData.reverse(),
                     borderColor: colors[colorIndex % colors.length],
                     backgroundColor: colors[colorIndex % colors.length],
                     fill: false,
@@ -361,26 +419,115 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedRegion = this.getAttribute('data-region');
             
             if (selectedRegion === 'all') {
-                // 重新獲取所有數據
-                fetch('/api/plc/data')
-                    .then(response => response.json())
-                    .then(data => updateData(data))
-                    .catch(error => console.error('獲取數據失敗:', error));
+                // 使用 Socket 即時數據，不需要重新獲取
+                if (Object.keys(plcData).length > 0) {
+                    updateData(plcData);
+                }
             } else {
                 // 獲取特定區域數據
-                fetch(`/api/plc/region/${selectedRegion}`)
-                    .then(response => response.json())
-                    .then(data => updateData({ [selectedRegion]: data }))
-                    .catch(error => console.error('獲取數據失敗:', error));
+                if (plcData[selectedRegion]) {
+                    updateData({ [selectedRegion]: plcData[selectedRegion] });
+                } else {
+                    fetch(`/api/plc/region/${selectedRegion}`)
+                        .then(response => response.json())
+                        .then(data => updateData({ [selectedRegion]: data }))
+                        .catch(error => console.error('獲取數據失敗:', error));
+                }
             }
         });
     });
     
-    // 初始加載所有數據
-    fetch('/api/plc/data')
+    // 切換編輯模式
+    function toggleEditMode() {
+        editMode = !editMode;
+        const editBtn = document.getElementById('toggleEditBtn');
+        const saveBtn = document.getElementById('saveOrderBtn');
+        const editContainer = document.getElementById('editOrderContainer');
+        const dataGrid = document.getElementById('dataGrid');
+        
+        if (editMode) {
+            editBtn.innerHTML = '<i class="fas fa-times"></i> 取消編輯';
+            editBtn.className = 'btn btn-danger';
+            saveBtn.style.display = 'inline-block';
+            editContainer.style.display = 'block';
+            
+            // 建立可拖曳容器
+            const sortableContainer = document.getElementById('sortableContainer');
+            sortableContainer.innerHTML = '';
+            
+            // 獲取當前順序
+            fetch('/api/region-order')
+                .then(response => response.json())
+                .then(orderedRegions => {
+                    orderedRegions.forEach(region => {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge badge-secondary m-2 p-2';
+                        badge.style.cssText = 'font-size: 1rem; cursor: move; display: inline-block; padding: 10px 15px; background: #6c757d; color: white; border-radius: 5px;';
+                        badge.textContent = regionLabels[region] || region;
+                        badge.setAttribute('data-region', region);
+                        sortableContainer.appendChild(badge);
+                    });
+                    
+                    // 初始化 Sortable
+                    if (sortableInstance) {
+                        sortableInstance.destroy();
+                    }
+                    sortableInstance = new Sortable(sortableContainer, {
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag'
+                    });
+                });
+            
+            // 隱藏數據網格
+            dataGrid.style.display = 'none';
+        } else {
+            editBtn.innerHTML = '<i class="fas fa-edit"></i> 編輯順序';
+            editBtn.className = 'btn btn-secondary';
+            saveBtn.style.display = 'none';
+            editContainer.style.display = 'none';
+            dataGrid.style.display = 'grid';
+        }
+    }
+    
+    // 儲存區域順序
+    function saveRegionOrder() {
+        if (!sortableInstance) return;
+        
+        const sortableContainer = document.getElementById('sortableContainer');
+        const newOrder = [];
+        sortableContainer.querySelectorAll('[data-region]').forEach(el => {
+            newOrder.push(el.getAttribute('data-region'));
+        });
+        
+        fetch('/api/region-order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newOrder)
+        })
         .then(response => response.json())
-        .then(data => updateData(data))
-        .catch(error => console.error('初始加載失敗:', error));
-});
-</script>
+        .then(data => {
+            if (data.status === 'success') {
+                alert('區域順序已儲存！');
+                toggleEditMode();
+                // 重新載入頁面以應用新順序
+                location.reload();
+            } else {
+                alert('儲存失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('儲存失敗：' + error);
+        });
+    }
+    
+    // 初始加載所有數據
+        fetch('/api/plc/data')
+            .then(response => response.json())
+            .then(data => updateData(data))
+            .catch(error => console.error('初始加載失敗:', error));
+    });
+    </script>
 {% endblock %}

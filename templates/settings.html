@@ -1,0 +1,591 @@
+{% extends "base.html" %}
+
+{% block title %}設定 - 釀造生產 PLC 監控系統{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-3"><i class="fas fa-cog"></i> 系統設定</h2>
+        <p class="text-muted">配置 PLC 連接和系統參數</p>
+    </div>
+</div>
+
+<!-- PLC 設定 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-microchip"></i> PLC 連接設定
+            </div>
+            <div class="card-body">
+                <form id="plcSettingsForm">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="plc_ip" class="form-label">PLC IP 位址</label>
+                            <input type="text" class="form-control" id="plc_ip" value="{{ plc_config.plc_ip if plc_config else '192.168.60.201' }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="plc_rack" class="form-label">Rack</label>
+                            <input type="number" class="form-control" id="plc_rack" value="{{ plc_config.plc_rack if plc_config else 0 }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="plc_slot" class="form-label">Slot</label>
+                            <input type="number" class="form-control" id="plc_slot" value="{{ plc_config.plc_slot if plc_config else 2 }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-primary" onclick="savePlcSettings()">
+                                <i class="fas fa-save"></i> 儲存 PLC 設定
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="plcStatus" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 資料庫設定 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-database"></i> 資料庫設定
+            </div>
+            <div class="card-body">
+                <form id="dbSettingsForm">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="db_enabled" {{ 'checked' if db_config and db_config.get('enabled') else '' }}>
+                                <label class="form-check-label" for="db_enabled">啟用資料庫寫入</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="db_host" class="form-label">資料庫主機</label>
+                            <input type="text" class="form-control" id="db_host" value="{{ db_config.db_host if db_config else '192.168.60.12' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="db_user" class="form-label">使用者名稱</label>
+                            <input type="text" class="form-control" id="db_user" value="{{ db_config.db_user if db_config else 'zhangmen' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="db_password" class="form-label">密碼</label>
+                            <input type="password" class="form-control" id="db_password" value="{{ db_config.db_password if db_config else '54685508' }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-primary" onclick="saveDbSettings()">
+                                <i class="fas fa-save"></i> 儲存
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-4 mb-3">
+                            <label for="db_database" class="form-label">資料庫名稱</label>
+                            <input type="text" class="form-control" id="db_database" value="{{ db_config.db_database if db_config else 'zmb' }}">
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Google Sheets 設定 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fab fa-google"></i> Google Sheets 設定
+            </div>
+            <div class="card-body">
+                <form id="gsSettingsForm">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="gs_enabled" {{ 'checked' if gs_config and gs_config.get('enabled') else '' }}>
+                                <label class="form-check-label" for="gs_enabled">啟用 Google Sheets 寫入</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="gs_key" class="form-label">Service Account JSON 檔案路徑</label>
+                            <input type="text" class="form-control" id="gs_key" value="{{ gs_config.gs_key if gs_config else 'zmb54685508-c88132768091.json' }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-primary" onclick="saveGsSettings()">
+                                <i class="fas fa-save"></i> 儲存
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PLC 標籤設定 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-tags"></i> PLC 標籤設定</span>
+                <button type="button" class="btn btn-sm btn-success" onclick="addNewRegion()">
+                    <i class="fas fa-plus"></i> 新增區域
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="regionsList">
+                    <!-- 區域列表將由 JavaScript 動態生成 -->
+                </div>
+                <div class="mt-3">
+                    <button type="button" class="btn btn-primary" onclick="savePlcTags()">
+                        <i class="fas fa-save"></i> 儲存所有標籤設定
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="loadPlcTags()">
+                        <i class="fas fa-refresh"></i> 重新載入
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 區域顯示順序 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list-ol"></i> 區域顯示順序
+            </div>
+            <div class="card-body">
+                <div id="regionOrderList">
+                    <!-- 區域列表將由 JavaScript 動態生成 -->
+                </div>
+                <div class="mt-3">
+                    <button type="button" class="btn btn-warning" onclick="saveRegionOrder()">
+                        <i class="fas fa-save"></i> 儲存區域順序
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 測試連接 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-plug"></i> 測試連接
+            </div>
+            <div class="card-body">
+                <button type="button" class="btn btn-success" onclick="testPlcConnection()">
+                    <i class="fas fa-plug"></i> 測試 PLC 連接
+                </button>
+                <button type="button" class="btn btn-info" onclick="testDbConnection()">
+                    <i class="fas fa-database"></i> 測試資料庫連接
+                </button>
+                <div id="connectionTestResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 全域變數
+let plcTagsData = {};
+
+// 載入設定頁面
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlcTags();
+    loadRegionOrder();
+});
+
+// 儲存 PLC 設定
+function savePlcSettings() {
+    const config = {
+        plc_ip: document.getElementById('plc_ip').value,
+        plc_rack: parseInt(document.getElementById('plc_rack').value),
+        plc_slot: parseInt(document.getElementById('plc_slot').value)
+    };
+    
+    fetch('/api/settings/plc', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            document.getElementById('plcStatus').innerHTML = 
+                '<div class="alert alert-success">PLC 設定已儲存！需要重新啟動容器才能生效。</div>';
+        } else {
+            document.getElementById('plcStatus').innerHTML = 
+                '<div class="alert alert-danger">儲存失敗：' + data.message + '</div>';
+        }
+    })
+    .catch(error => {
+        document.getElementById('plcStatus').innerHTML = 
+            '<div class="alert alert-danger">儲存失敗：' + error + '</div>';
+    });
+}
+
+// 儲存資料庫設定
+function saveDbSettings() {
+    const config = {
+        enabled: document.getElementById('db_enabled').checked,
+        db_host: document.getElementById('db_host').value,
+        db_user: document.getElementById('db_user').value,
+        db_password: document.getElementById('db_password').value,
+        db_database: document.getElementById('db_database').value
+    };
+    
+    fetch('/api/settings/database', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('資料庫設定已儲存！' + (config.enabled ? '資料庫寫入已啟用' : '資料庫寫入已停用'));
+        } else {
+            alert('儲存失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('儲存失敗：' + error);
+    });
+}
+
+// 儲存 Google Sheets 設定
+function saveGsSettings() {
+    const config = {
+        enabled: document.getElementById('gs_enabled').checked,
+        gs_key: document.getElementById('gs_key').value
+    };
+    
+    fetch('/api/settings/google-sheets', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Google Sheets 設定已儲存！' + (config.enabled ? 'Google Sheets 寫入已啟用' : 'Google Sheets 寫入已停用'));
+        } else {
+            alert('儲存失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('儲存失敗：' + error);
+    });
+}
+
+// 載入 PLC 標籤
+function loadPlcTags() {
+    fetch('/api/plc-tags')
+        .then(response => response.json())
+        .then(data => {
+            plcTagsData = data;
+            renderPlcTags();
+        })
+        .catch(error => {
+            console.error('載入 PLC 標籤失敗:', error);
+            alert('載入 PLC 標籤失敗');
+        });
+}
+
+// 渲染 PLC 標籤
+function renderPlcTags() {
+    const container = document.getElementById('regionsList');
+    container.innerHTML = '';
+    
+    Object.keys(plcTagsData).forEach(region => {
+        const regionDiv = document.createElement('div');
+        regionDiv.className = 'border rounded mb-3 p-3';
+        regionDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">${region}</h5>
+                <button type="button" class="btn btn-sm btn-danger" onclick="deleteRegion('${region}')">
+                    <i class="fas fa-trash"></i> 刪除
+                </button>
+            </div>
+            <div class="tags-container" id="tags-${region.replace(/[^a-zA-Z0-9]/g, '-')}">
+                <!-- 標籤將由 JavaScript 動態生成 -->
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addTag('${region}')">
+                <i class="fas fa-plus"></i> 新增標籤
+            </button>
+        `;
+        container.appendChild(regionDiv);
+        
+        // 渲染該區域的標籤
+        renderRegionTags(region, plcTagsData[region]);
+    });
+}
+
+// 渲染區域標籤
+function renderRegionTags(region, tags) {
+    const containerId = `tags-${region.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.innerHTML = '<div class="row mb-2"></div>';
+    
+    Object.keys(tags).forEach(tagName => {
+        const tagAddress = tags[tagName];
+        const row = document.createElement('div');
+        row.className = 'row mb-2 tag-row';
+        row.setAttribute('data-tag', tagName);
+        row.innerHTML = `
+            <div class="col-md-4">
+                <input type="text" class="form-control form-control-sm tag-name" value="${tagName}" placeholder="標籤名稱">
+            </div>
+            <div class="col-md-6">
+                <input type="text" class="form-control form-control-sm tag-address" value="${tagAddress}" placeholder="PLC 位址 (如：DB40.DBD8)">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-sm btn-danger w-100" onclick="this.closest('.tag-row').remove()">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        container.querySelector('.row').appendChild(row);
+    });
+}
+
+// 新增區域
+function addNewRegion() {
+    const regionName = prompt('請輸入區域名稱：');
+    if (regionName && !plcTagsData[regionName]) {
+        plcTagsData[regionName] = {};
+        renderPlcTags();
+    } else if (plcTagsData[regionName]) {
+        alert('該區域已存在！');
+    }
+}
+
+// 刪除區域
+function deleteRegion(region) {
+    if (confirm(`確定要刪除區域 "${region}" 嗎？`)) {
+        delete plcTagsData[region];
+        renderPlcTags();
+    }
+}
+
+// 新增標籤
+function addTag(region) {
+    const tagName = prompt('請輸入標籤名稱：');
+    if (tagName) {
+        const tagAddress = prompt('請輸入 PLC 位址 (如：DB40.DBD8, Q4.3)：');
+        if (tagAddress) {
+            if (!plcTagsData[region]) {
+                plcTagsData[region] = {};
+            }
+            plcTagsData[region][tagName] = tagAddress;
+            renderPlcTags();
+        }
+    }
+}
+
+// 儲存 PLC 標籤
+function savePlcTags() {
+    const container = document.getElementById('regionsList');
+    const newTagsData = {};
+    
+    container.querySelectorAll('.border.rounded').forEach(regionDiv => {
+        const regionName = regionDiv.querySelector('h5').textContent;
+        const tags = {};
+        
+        regionDiv.querySelectorAll('.tag-row').forEach(row => {
+            const tagName = row.querySelector('.tag-name').value;
+            const tagAddress = row.querySelector('.tag-address').value;
+            if (tagName && tagAddress) {
+                tags[tagName] = tagAddress;
+            }
+        });
+        
+        newTagsData[regionName] = tags;
+    });
+    
+    fetch('/api/plc-tags', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newTagsData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('PLC 標籤設定已儲存！');
+            loadPlcTags();
+        } else {
+            alert('儲存失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('儲存失敗：' + error);
+    });
+}
+
+// 載入區域順序
+function loadRegionOrder() {
+    fetch('/api/region-order')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('regionOrderList');
+            container.innerHTML = '';
+            
+            let index = 1;
+            data.forEach(region => {
+                const row = document.createElement('div');
+                row.className = 'input-group mb-2';
+                row.innerHTML = `
+                    <span class="input-group-text">${index++}</span>
+                    <input type="text" class="form-control region-order-item" data-original="${region}" value="${region}">
+                    <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                container.appendChild(row);
+            });
+            
+            // 添加新增按鈕
+            const addBtn = document.createElement('div');
+            addBtn.className = 'mt-2';
+            addBtn.innerHTML = `
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRegionOrderItem()">
+                    <i class="fas fa-plus"></i> 新增區域
+                </button>
+            `;
+            container.appendChild(addBtn);
+        })
+        .catch(error => console.error('載入區域順序失敗:', error));
+}
+
+// 新增區域順序項目
+function addRegionOrderItem() {
+    const container = document.getElementById('regionOrderList');
+    const addBtn = container.querySelector('.mt-2');
+    
+    const row = document.createElement('div');
+    row.className = 'input-group mb-2';
+    row.innerHTML = `
+        <span class="input-group-text">${container.querySelectorAll('.region-order-item').length + 1}</span>
+        <input type="text" class="form-control region-order-item" value="">
+        <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    
+    if (addBtn) {
+        container.insertBefore(row, addBtn);
+    } else {
+        container.appendChild(row);
+    }
+    
+    // 更新編號
+    updateOrderNumbers();
+}
+
+// 更新編號
+function updateOrderNumbers() {
+    const rows = document.querySelectorAll('#regionOrderList .input-group');
+    rows.forEach((row, index) => {
+        const numSpan = row.querySelector('.input-group-text');
+        if (numSpan) {
+            numSpan.textContent = index + 1;
+        }
+    });
+}
+
+// 儲存區域順序
+function saveRegionOrder() {
+    const items = document.querySelectorAll('.region-order-item');
+    const order = [];
+    
+    items.forEach(item => {
+        const value = item.value.trim();
+        if (value) {
+            order.push(value);
+        }
+    });
+    
+    fetch('/api/region-order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(order)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('區域順序已儲存！');
+            loadRegionOrder();
+        } else {
+            alert('儲存失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('儲存失敗：' + error);
+    });
+}
+
+// 測試 PLC 連接
+function testPlcConnection() {
+    const resultDiv = document.getElementById('connectionTestResult');
+    resultDiv.innerHTML = '<div class="alert alert-info">正在測試 PLC 連接...</div>';
+    
+    fetch('/api/settings/test-plc')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                resultDiv.innerHTML = '<div class="alert alert-success">PLC 連接成功！' + (data.message ? ' (' + data.message + ')' : '') + '</div>';
+            } else {
+                resultDiv.innerHTML = '<div class="alert alert-danger">PLC 連接失敗：' + data.message + '</div>';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<div class="alert alert-danger">測試失敗：' + error + '</div>';
+        });
+}
+
+// 測試資料庫連接
+function testDbConnection() {
+    const resultDiv = document.getElementById('connectionTestResult');
+    resultDiv.innerHTML = '<div class="alert alert-info">正在測試資料庫連接...</div>';
+    
+    fetch('/api/settings/test-database')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                resultDiv.innerHTML = '<div class="alert alert-success">資料庫連接成功！' + (data.message ? ' (' + data.message + ')' : '') + '</div>';
+            } else {
+                resultDiv.innerHTML = '<div class="alert alert-danger">資料庫連接失敗：' + data.message + '</div>';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<div class="alert alert-danger">測試失敗：' + error + '</div>';
+        });
+}
+</script>
+{% endblock %}
