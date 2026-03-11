@@ -14,7 +14,7 @@ from threading import Lock
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'zmb-brewery-plc-monitor'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", manage_session=False)
 
 # 全域變數
 plc_client = None
@@ -46,6 +46,76 @@ def save_settings(settings):
         print(f"儲存設定失敗：{e}")
         return False
 
+def apply_settings_to_runtime(settings):
+    """將設定即時套用到執行中的 plc_reader（可免重啟）"""
+    global plc_reader
+    if not plc_reader:
+        return
+
+    general_config = settings.get('general', {})
+    plc_reader.write_interval = general_config.get('write_interval', 300)
+
+    db_config = settings.get('database', {})
+    plc_reader.sql_host = db_config.get('db_host', '192.168.60.12')
+    plc_reader.sql_user = db_config.get('db_user', 'zhangmen')
+    plc_reader.sql_password = db_config.get('db_password', '54685508')
+    plc_reader.sql_database = db_config.get('db_database', 'zmb')
+    plc_reader.sql_enabled = db_config.get('enabled', False)
+
+    gs_config = settings.get('google_sheets', {})
+    plc_reader.gs_key = gs_config.get('gs_key', 'zmb54685508-c88132768091.json')
+    plc_reader.gs_enabled = gs_config.get('enabled', False)
+
+    beername_config = settings.get('beername', {})
+    plc_reader.beername_enabled = beername_config.get('enabled', False)
+    plc_reader.beername_sheet_url = beername_config.get('sheet_url', 'https://docs.google.com/spreadsheets/d/1QUh-ZHlJSFG0RhkmP0JT7WBxRUqC8EgCMwGn7lZVQas/edit#gid=877936540')
+    plc_reader.beername_worksheet_title = beername_config.get('worksheet_title', '發酵桶現況')
+    plc_reader.beername_column_index = beername_config.get('column_index', 3)
+    plc_reader.beername_start_row = beername_config.get('start_row', 2)
+    plc_reader.beername_end_row = beername_config.get('end_row', 23)
+    plc_reader.beername_db_number = beername_config.get('db_number', 142)
+    plc_reader.beername_string_size = beername_config.get('string_size', 256)
+    plc_reader.beername_write_interval = beername_config.get('write_interval', 300)
+    plc_reader.beername_carousel_enabled = beername_config.get('carousel_enabled', True)
+    plc_reader.beername_carousel_interval = beername_config.get('carousel_interval', 10)
+
+    ranges = beername_config.get('ranges', [])
+    if not ranges:
+        ranges = [{
+            'worksheet_title': plc_reader.beername_worksheet_title,
+            'column_index': plc_reader.beername_column_index,
+            'start_row': plc_reader.beername_start_row,
+            'end_row': plc_reader.beername_end_row
+        }]
+    plc_reader.beername_ranges = ranges
+    plc_reader._carousel_current_index = 0
+
+    plc_config = settings.get('plc', {})
+    new_ip = plc_config.get('plc_ip', "192.168.60.201")
+    new_rack = plc_config.get('plc_rack', 0)
+    new_slot = plc_config.get('plc_slot', 2)
+
+    should_reconnect = (
+        plc_reader.plc_ip != new_ip or
+        plc_reader.plc_rack != new_rack or
+        plc_reader.plc_slot != new_slot
+    )
+
+    plc_reader.plc_ip = new_ip
+    plc_reader.plc_rack = new_rack
+    plc_reader.plc_slot = new_slot
+
+    if should_reconnect:
+        try:
+            plc_reader.client.disconnect()
+        except Exception:
+            pass
+        try:
+            plc_reader.client.connect(plc_reader.plc_ip, plc_reader.plc_rack, plc_reader.plc_slot)
+            print(f"已重新連接到 PLC: {plc_reader.plc_ip}")
+        except Exception as e:
+            print(f"重新連接 PLC 失敗：{e}")
+
 class ZMBPlcReader:
     """PLC 數據讀取類別"""
     
@@ -62,6 +132,34 @@ class ZMBPlcReader:
         self.gs_key = gs_config.get('gs_key', 'zmb54685508-c88132768091.json')
         self.gs_title = 'ZMB-' + str(datetime.date.today())[:-3]
         self.gs_enabled = gs_config.get('enabled', False)
+        
+        # 酒款名稱寫入設定（輪播模式）
+        beername_config = settings.get('beername', {})
+        self.beername_enabled = beername_config.get('enabled', False)
+        self.beername_sheet_url = beername_config.get('sheet_url', 'https://docs.google.com/spreadsheets/d/1QUh-ZHlJSFG0RhkmP0JT7WBxRUqC8EgCMwGn7lZVQas/edit#gid=877936540')
+        self.beername_worksheet_title = beername_config.get('worksheet_title', '發酵桶現況')
+        self.beername_column_index = beername_config.get('column_index', 3)  # 預設第 3 列 (C 欄)
+        self.beername_start_row = beername_config.get('start_row', 2)  # 預設從第 2 行開始
+        self.beername_end_row = beername_config.get('end_row', 23)  # 預設到第 23 行
+        self.beername_db_number = beername_config.get('db_number', 142)  # PLC DB 編號
+        self.beername_string_size = beername_config.get('string_size', 256)  # 每個酒款字串大小
+        self.beername_write_interval = beername_config.get('write_interval', 300)  # 寫入間隔
+        
+        # 輪播設定（預設啟用）
+        self.beername_carousel_enabled = beername_config.get('carousel_enabled', True)
+        self.beername_carousel_interval = beername_config.get('carousel_interval', 10)  # 輪播間隔（秒）
+        self.beername_ranges = beername_config.get('ranges', [])  # 輪播範圍列表
+        if not self.beername_ranges:
+            self.beername_ranges = [{
+                'worksheet_title': self.beername_worksheet_title,
+                'column_index': self.beername_column_index,
+                'start_row': self.beername_start_row,
+                'end_row': self.beername_end_row
+            }]
+        
+        # 輪播狀態追蹤
+        self._carousel_current_index = 0
+        self._carousel_last_rotation_time = 0
         
         # 資料庫設定
         db_config = settings.get('database', {})
@@ -130,10 +228,6 @@ class ZMBPlcReader:
             success_count = 0
             
             for region, region_data in data.items():
-                table_name = region_to_table(region)
-                if not table_name:
-                    continue
-                
                 try:
                     # 建立資料表（如果不存在），DDL 單獨 commit
                     if region in self.sql_create_commands:
@@ -143,6 +237,10 @@ class ZMBPlcReader:
                     # 動態建立 INSERT 語句（欄位名稱移除空格並轉小寫）
                     timestamp = region_data.get('timestamp', datetime.datetime.now())
                     tags = self.plc_tag.get(region, {})
+                    table_name = region_to_table(region)
+                    if not table_name:
+                        print(f"找不到區域 {region} 對應的資料表，略過寫入")
+                        continue
                     
                     columns = ['timestamp']
                     values = [timestamp]
@@ -331,6 +429,95 @@ class ZMBPlcReader:
                 self.client.disconnect()
             except:
                 pass
+    
+    def write_beername_to_plc(self):
+        """從 Google Sheet 讀取酒款名稱並寫入 PLC DB142（使用 Big5 編碼）- 輪播模式"""
+        try:
+            return self._write_beername_with_carousel()
+        except Exception as e:
+            print(f"寫入酒款名稱到 PLC 失敗：{e}")
+            return False
+    
+    def _write_beername_with_carousel(self):
+        """輪播模式寫入 - 每次寫入一個範圍後等待間隔時間再寫入下一個範圍"""
+        if not self.beername_ranges:
+            print("輪播範圍為空，略過酒款名稱寫入")
+            return False
+
+        # 獲取當前範圍設定
+        current_range = self.beername_ranges[self._carousel_current_index]
+        
+        try:
+            gc = pygsheets.authorize(service_account_file=self.gs_key)
+            ss = gc.open_by_url(self.beername_sheet_url)
+            
+            # 根據範圍類型獲取工作表
+            if 'worksheet_title' in current_range:
+                wks = ss.worksheet_by_title(current_range['worksheet_title'])
+            else:
+                wks = ss.worksheet_by_title(self.beername_worksheet_title)
+            
+            # 讀取指定列的酒款名稱
+            start_row = current_range.get('start_row', self.beername_start_row)
+            end_row = current_range.get('end_row', self.beername_end_row)
+            column_index = current_range.get('column_index', self.beername_column_index)
+            
+            beername = wks.get_col(column_index)[start_row-1:end_row-1]
+            
+            print(f"輪播範圍 {self._carousel_current_index + 1}: 讀取 {len(beername)} 個酒款名稱")
+            
+            # 寫入當前範圍的資料到 PLC
+            result = self._write_beername_to_plc(beername)
+
+            # 切換到下一個範圍（為下次呼叫準備）
+            self._carousel_current_index = (self._carousel_current_index + 1) % len(self.beername_ranges)
+            
+            print(f"輪播切換到範圍 {self._carousel_current_index + 1}/{len(self.beername_ranges)}")
+            
+            return result
+        except Exception as e:
+            print(f"輪播寫入失敗：{e}")
+            return False
+    
+    def _write_beername_to_plc(self, beername):
+        """將酒款名稱寫入 PLC（共用方法）"""
+        try:
+            # 連接 PLC
+            client = snap7.client.Client()
+            client.connect(self.plc_ip, self.plc_rack, self.plc_slot)
+            
+            # 將每個酒款名稱寫入 PLC 的 DB 區塊（使用 Big5 編碼）
+            for i in range(len(beername)):
+                data = bytearray(self.beername_string_size)
+                
+                # 使用 Big5 編碼轉換繁體中文
+                try:
+                    beername_bytes = beername[i].encode('big5', errors='ignore')
+                except:
+                    beername_bytes = beername[i].encode('utf-8', errors='ignore')
+                
+                # S7-300 String 格式：
+                # 第一個字節：最大長度
+                # 第二個字節：實際長度
+                # 其餘：字串內容
+                max_len = self.beername_string_size - 2
+                actual_len = min(len(beername_bytes), max_len)
+                
+                data[0] = max_len  # 最大長度
+                data[1] = actual_len  # 實際長度
+                
+                # 複製字節數據到 DB
+                for j in range(actual_len):
+                    data[2 + j] = beername_bytes[j]
+                
+                client.db_write(db_number=self.beername_db_number, start=i*self.beername_string_size, data=data)
+            
+            client.disconnect()
+            print(f"成功寫入 {len(beername)} 個酒款名稱到 PLC DB{self.beername_db_number}（Big5 編碼）")
+            return True
+        except Exception as e:
+            print(f"寫入酒款名稱到 PLC 失敗：{e}")
+            return False
 
 # 全域 PLC 讀取器
 plc_reader = None
@@ -346,6 +533,7 @@ def plc_data_updater():
     global running, plc_data_cache
     
     last_write_time = 0  # 上次寫入時間戳記
+    last_beername_write = 0  # 上次酒款名稱寫入時間戳記
     
     while running:
         try:
@@ -363,6 +551,13 @@ def plc_data_updater():
                     if plc_reader.gs_enabled:
                         plc_reader.write_to_google_sheet(data)
                     last_write_time = current_time
+
+                # 酒款輪播獨立觸發，不再綁定 write_interval（5 分鐘）
+                if plc_reader and plc_reader.beername_enabled:
+                    carousel_interval = plc_reader.beername_carousel_interval if plc_reader.beername_carousel_interval > 0 else 10
+                    if current_time - last_beername_write >= carousel_interval:
+                        plc_reader.write_beername_to_plc()
+                        last_beername_write = current_time
         except Exception as e:
             print(f"更新 PLC 數據時發生錯誤：{e}")
         
@@ -404,7 +599,7 @@ def api_plc_region(region_name):
     with data_lock:
         if region_name in plc_data_cache:
             return jsonify(plc_data_cache[region_name])
-        return jsonify({"error": f"區域 {region_name} 不存在"}), 404
+        return jsonify({"error": f"區域 {region_name} 不存在"})
 
 @app.route('/api/plc-tags')
 def api_plc_tags():
@@ -560,7 +755,8 @@ def settings():
                          general_config=settings.get('general', {}),
                          plc_config=settings.get('plc', {}),
                          db_config=settings.get('database', {}),
-                         gs_config=settings.get('google_sheets', {}))
+                         gs_config=settings.get('google_sheets', {}),
+                         beername_config=settings.get('beername', {}))
 
 @app.route('/api/settings/general', methods=['POST'])
 def api_settings_general():
@@ -569,9 +765,7 @@ def api_settings_general():
         settings = load_settings()
         settings['general'] = request.get_json()
         if save_settings(settings):
-            # 即時更新 write_interval 不需重啟
-            if plc_reader:
-                plc_reader.write_interval = settings['general'].get('write_interval', 300)
+            apply_settings_to_runtime(settings)
             return jsonify({'status': 'success', 'message': '一般設定已儲存'})
         return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
     except Exception as e:
@@ -584,7 +778,8 @@ def api_settings_plc():
         settings = load_settings()
         settings['plc'] = request.get_json()
         if save_settings(settings):
-            return jsonify({'status': 'success', 'message': 'PLC 設定已儲存'})
+            apply_settings_to_runtime(settings)
+            return jsonify({'status': 'success', 'message': 'PLC 設定已儲存，已嘗試即時套用'})
         return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -596,7 +791,8 @@ def api_settings_database():
         settings = load_settings()
         settings['database'] = request.get_json()
         if save_settings(settings):
-            return jsonify({'status': 'success', 'message': '資料庫設定已儲存'})
+            apply_settings_to_runtime(settings)
+            return jsonify({'status': 'success', 'message': '資料庫設定已儲存，已即時套用'})
         return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -608,17 +804,42 @@ def api_settings_google_sheets():
         settings = load_settings()
         settings['google_sheets'] = request.get_json()
         if save_settings(settings):
-            return jsonify({'status': 'success', 'message': 'Google Sheets 設定已儲存'})
+            apply_settings_to_runtime(settings)
+            return jsonify({'status': 'success', 'message': 'Google Sheets 設定已儲存，已即時套用'})
         return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/api/settings/test-plc')
+@app.route('/api/settings/beername', methods=['POST'])
+def api_settings_beername():
+    """API: 儲存酒款名稱設定"""
+    try:
+        settings = load_settings()
+        beername_config = request.get_json()
+        if not isinstance(beername_config, dict):
+            return jsonify({'status': 'error', 'message': '請求格式錯誤'}), 400
+
+        ranges = beername_config.get('ranges', [])
+        if beername_config.get('enabled', False) and (not isinstance(ranges, list) or len(ranges) == 0):
+            return jsonify({'status': 'error', 'message': '啟用酒款輪播時，至少需要一個啟用的範圍'}), 400
+
+        settings['beername'] = beername_config
+        if save_settings(settings):
+            apply_settings_to_runtime(settings)
+            return jsonify({'status': 'success', 'message': '酒款名稱設定已儲存，已即時套用'})
+        return jsonify({'status': 'error', 'message': '儲存失敗'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/settings/test-plc', methods=['GET', 'POST'])
 def api_test_plc():
     """API: 測試 PLC 連接"""
     try:
-        settings = load_settings()
-        plc_config = settings.get('plc', {})
+        if request.method == 'POST':
+            plc_config = request.get_json() or {}
+        else:
+            settings = load_settings()
+            plc_config = settings.get('plc', {})
         plc_ip = plc_config.get('plc_ip', '192.168.60.201')
         plc_rack = plc_config.get('plc_rack', 0)
         plc_slot = plc_config.get('plc_slot', 2)
@@ -634,12 +855,15 @@ def api_test_plc():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/api/settings/test-database')
+@app.route('/api/settings/test-database', methods=['GET', 'POST'])
 def api_test_database():
     """API: 測試資料庫連接"""
     try:
-        settings = load_settings()
-        db_config = settings.get('database', {})
+        if request.method == 'POST':
+            db_config = request.get_json() or {}
+        else:
+            settings = load_settings()
+            db_config = settings.get('database', {})
         db_host = db_config.get('db_host', '192.168.60.12')
         db_user = db_config.get('db_user', 'zhangmen')
         db_password = db_config.get('db_password', '54685508')
@@ -685,6 +909,9 @@ if __name__ == '__main__':
     
     # 啟動背景更新器
     start_background_updater()
-    
+
+    # 透過環境變數控制埠號，容器預設使用 8001
+    port = int(os.environ.get('PORT', '8001'))
+
     # 啟動 Flask 伺服器（use_reloader=False 防止 Werkzeug 啟動第二個進程重複寫入）
-    socketio.run(app, host='0.0.0.0', port=8001, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)

@@ -161,6 +161,209 @@
     </div>
 </div>
 
+<!-- 酒款名稱輪播設定 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-wine-bottle"></i> 酒款名稱輪播設定
+            </div>
+            <div class="card-body">
+                <form id="beernameSettingsForm">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="beername_enabled" {{ 'checked' if beername_config and beername_config.get('enabled') else 'checked' }}>
+                                <label class="form-check-label" for="beername_enabled">啟用酒款名稱輪播寫入 PLC</label>
+                            </div>
+                            <div class="form-text">啟用後，系統會依序輪播多個範圍的酒款名稱並寫入 PLC DB 區塊。</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="beername_sheet_url" class="form-label">Google Sheet URL</label>
+                            <input type="text" class="form-control" id="beername_sheet_url"
+                                   value="{{ beername_config.sheet_url if beername_config else 'https://docs.google.com/spreadsheets/d/1QUh-ZHlJSFG0RhkmP0JT7WBxRUqC8EgCMwGn7lZVQas/edit#gid=877936540' }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-primary d-block" onclick="saveBeernameSettings()">
+                                <i class="fas fa-save"></i> 儲存
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 輪播設定 -->
+                    <hr class="mt-4">
+                    <h5 class="mb-3"><i class="fas fa-sync-alt"></i> 輪播設定</h5>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="beername_carousel_interval" class="form-label">輪播間隔 (秒)</label>
+                            <input type="number" class="form-control" id="beername_carousel_interval"
+                                   min="5" max="3600"
+                                   value="{{ beername_config.carousel_interval if beername_config else 10 }}">
+                            <div class="form-text">預設 10 秒，輪播切換的間隔時間</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 輪播範圍設定 -->
+                    <div id="carouselRangesContainer" class="mt-3">
+                        <h6 class="mb-3">輪播範圍配置（最多 3 個範圍）</h6>
+                        
+                        <!-- 範圍 1 -->
+                        <div class="card mb-2 carousel-range-card" data-range-index="0">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0"><i class="fas fa-layer-group"></i> 範圍 1</h6>
+                                    <span class="badge bg-primary">預設範圍</span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label small">WorkSheet 標題</label>
+                                        <input type="text" class="form-control form-control-sm range-worksheet-title"
+                                               value="{{ beername_config.ranges[0].worksheet_title if beername_config and beername_config.ranges and beername_config.ranges|length > 0 else '發酵桶現況' }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">欄位索引</label>
+                                        <input type="number" class="form-control form-control-sm range-column-index"
+                                               min="1" max="256"
+                                               value="{{ beername_config.ranges[0].column_index if beername_config and beername_config.ranges and beername_config.ranges|length > 0 else 3 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">起始行</label>
+                                        <input type="number" class="form-control form-control-sm range-start-row"
+                                               min="1"
+                                               value="{{ beername_config.ranges[0].start_row if beername_config and beername_config.ranges and beername_config.ranges|length > 0 else 2 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">結束行</label>
+                                        <input type="number" class="form-control form-control-sm range-end-row"
+                                               min="1"
+                                               value="{{ beername_config.ranges[0].end_row if beername_config and beername_config.ranges and beername_config.ranges|length > 0 else 23 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">啟用</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input range-enabled" type="checkbox" {{ 'checked' if beername_config and beername_config.ranges and beername_config.ranges|length > 0 and beername_config.ranges[0].get('enabled', true) else '' }}>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 範圍 2 -->
+                        <div class="card mb-2 carousel-range-card" data-range-index="1">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0"><i class="fas fa-layer-group"></i> 範圍 2</h6>
+                                    <span class="badge bg-secondary">可選</span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label small">WorkSheet 標題</label>
+                                        <input type="text" class="form-control form-control-sm range-worksheet-title"
+                                               value="{{ beername_config.ranges[1].worksheet_title if beername_config and beername_config.ranges and beername_config.ranges|length > 1 else '發酵桶現況' }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">欄位索引</label>
+                                        <input type="number" class="form-control form-control-sm range-column-index"
+                                               min="1" max="256"
+                                               value="{{ beername_config.ranges[1].column_index if beername_config and beername_config.ranges and beername_config.ranges|length > 1 else 5 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">起始行</label>
+                                        <input type="number" class="form-control form-control-sm range-start-row"
+                                               min="1"
+                                               value="{{ beername_config.ranges[1].start_row if beername_config and beername_config.ranges and beername_config.ranges|length > 1 else 2 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">結束行</label>
+                                        <input type="number" class="form-control form-control-sm range-end-row"
+                                               min="1"
+                                               value="{{ beername_config.ranges[1].end_row if beername_config and beername_config.ranges and beername_config.ranges|length > 1 else 23 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">啟用</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input range-enabled" type="checkbox" {{ 'checked' if beername_config and beername_config.ranges and beername_config.ranges|length > 1 and beername_config.ranges[1].get('enabled', true) else '' }}>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 範圍 3 -->
+                        <div class="card mb-2 carousel-range-card" data-range-index="2">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0"><i class="fas fa-layer-group"></i> 範圍 3</h6>
+                                    <span class="badge bg-secondary">可選</span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label small">WorkSheet 標題</label>
+                                        <input type="text" class="form-control form-control-sm range-worksheet-title"
+                                               value="{{ beername_config.ranges[2].worksheet_title if beername_config and beername_config.ranges and beername_config.ranges|length > 2 else '發酵桶現況' }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">欄位索引</label>
+                                        <input type="number" class="form-control form-control-sm range-column-index"
+                                               min="1" max="256"
+                                               value="{{ beername_config.ranges[2].column_index if beername_config and beername_config.ranges and beername_config.ranges|length > 2 else 6 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">起始行</label>
+                                        <input type="number" class="form-control form-control-sm range-start-row"
+                                               min="1"
+                                               value="{{ beername_config.ranges[2].start_row if beername_config and beername_config.ranges and beername_config.ranges|length > 2 else 2 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">結束行</label>
+                                        <input type="number" class="form-control form-control-sm range-end-row"
+                                               min="1"
+                                               value="{{ beername_config.ranges[2].end_row if beername_config and beername_config.ranges and beername_config.ranges|length > 2 else 23 }}">
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <label class="form-label small">啟用</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input range-enabled" type="checkbox" {{ 'checked' if beername_config and beername_config.ranges and beername_config.ranges|length > 2 and beername_config.ranges[2].get('enabled', true) else '' }}>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PLC DB 設定 -->
+                    <hr class="mt-4">
+                    <h5 class="mb-3"><i class="fas fa-cog"></i> PLC DB 設定</h5>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="beername_db_number" class="form-label">PLC DB 編號</label>
+                            <input type="number" class="form-control" id="beername_db_number"
+                                   min="0" max="65535"
+                                   value="{{ beername_config.db_number if beername_config else 142 }}">
+                            <div class="form-text">預設為 DB142</div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="beername_string_size" class="form-label">字串大小 (位元組)</label>
+                            <input type="number" class="form-control" id="beername_string_size"
+                                   min="1" max="65535"
+                                   value="{{ beername_config.string_size if beername_config else 256 }}">
+                            <div class="form-text">每個酒款名稱佔用的位元組數</div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="fas fa-info-circle"></i> 輪播功能會依序切換不同範圍，每個範圍可以設定不同的工作表、欄位和行數範圍。
+                    </div>
+                </form>
+                <div id="beernameStatus" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- PLC 標籤設定 -->
 <div class="row mb-4">
     <div class="col-12">
@@ -241,6 +444,64 @@ document.addEventListener('DOMContentLoaded', function() {
     loadRegionOrder();
 });
 
+// 儲存酒款名稱設定
+function saveBeernameSettings() {
+    const config = {
+        enabled: document.getElementById('beername_enabled').checked,
+        sheet_url: document.getElementById('beername_sheet_url').value,
+        db_number: parseInt(document.getElementById('beername_db_number').value),
+        string_size: parseInt(document.getElementById('beername_string_size').value),
+        carousel_enabled: true,  // 輪播功能固定啟用
+        carousel_interval: parseInt(document.getElementById('beername_carousel_interval').value),
+        ranges: []
+    };
+    
+    // 收集輪播範圍配置
+    const rangeCards = document.querySelectorAll('.carousel-range-card');
+    rangeCards.forEach(card => {
+        const rangeIndex = parseInt(card.getAttribute('data-range-index'));
+        const isEnabled = card.querySelector('.range-enabled').checked;
+        
+        if (isEnabled) {
+            config.ranges.push({
+                worksheet_title: card.querySelector('.range-worksheet-title').value,
+                column_index: parseInt(card.querySelector('.range-column-index').value),
+                start_row: parseInt(card.querySelector('.range-start-row').value),
+                end_row: parseInt(card.querySelector('.range-end-row').value)
+            });
+        }
+    });
+
+    if (config.enabled && config.ranges.length === 0) {
+        document.getElementById('beernameStatus').innerHTML =
+            '<div class="alert alert-danger">啟用酒款輪播時，至少要啟用一個範圍。</div>';
+        return;
+    }
+    
+    fetch('/api/settings/beername', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // 重新載入頁面以顯示最新設定
+            location.reload();
+        } else {
+            document.getElementById('beernameStatus').innerHTML =
+                '<div class="alert alert-danger">儲存失敗：' + data.message + '</div>';
+        }
+        setTimeout(() => document.getElementById('beernameStatus').innerHTML = '', 5000);
+    })
+    .catch(error => {
+        document.getElementById('beernameStatus').innerHTML =
+            '<div class="alert alert-danger">儲存失敗：' + error + '</div>';
+    });
+}
+
 // 儲存一般設定
 function saveGeneralSettings() {
     const config = {
@@ -286,7 +547,7 @@ function savePlcSettings() {
     .then(data => {
         if (data.status === 'success') {
             document.getElementById('plcStatus').innerHTML = 
-                '<div class="alert alert-success">PLC 設定已儲存！需要重新啟動容器才能生效。</div>';
+                '<div class="alert alert-success">' + (data.message || 'PLC 設定已儲存，已嘗試即時套用。') + '</div>';
         } else {
             document.getElementById('plcStatus').innerHTML = 
                 '<div class="alert alert-danger">儲存失敗：' + data.message + '</div>';
@@ -611,8 +872,18 @@ function saveRegionOrder() {
 function testPlcConnection() {
     const resultDiv = document.getElementById('connectionTestResult');
     resultDiv.innerHTML = '<div class="alert alert-info">正在測試 PLC 連接...</div>';
-    
-    fetch('/api/settings/test-plc')
+
+    const payload = {
+        plc_ip: document.getElementById('plc_ip').value,
+        plc_rack: parseInt(document.getElementById('plc_rack').value),
+        plc_slot: parseInt(document.getElementById('plc_slot').value)
+    };
+
+    fetch('/api/settings/test-plc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
@@ -630,8 +901,19 @@ function testPlcConnection() {
 function testDbConnection() {
     const resultDiv = document.getElementById('connectionTestResult');
     resultDiv.innerHTML = '<div class="alert alert-info">正在測試資料庫連接...</div>';
-    
-    fetch('/api/settings/test-database')
+
+    const payload = {
+        db_host: document.getElementById('db_host').value,
+        db_user: document.getElementById('db_user').value,
+        db_password: document.getElementById('db_password').value,
+        db_database: document.getElementById('db_database').value
+    };
+
+    fetch('/api/settings/test-database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
