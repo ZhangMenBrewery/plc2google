@@ -75,9 +75,7 @@ def apply_settings_to_runtime(settings):
     plc_reader.beername_end_row = beername_config.get('end_row', 23)
     plc_reader.beername_db_number = beername_config.get('db_number', 142)
     plc_reader.beername_string_size = beername_config.get('string_size', 256)
-    plc_reader.beername_write_interval = beername_config.get('write_interval', 300)
-    plc_reader.beername_carousel_enabled = beername_config.get('carousel_enabled', True)
-    plc_reader.beername_carousel_interval = beername_config.get('carousel_interval', 10)
+    plc_reader.beername_update_interval = beername_config.get('update_interval', 300)
 
     ranges = beername_config.get('ranges', [])
     if not ranges:
@@ -88,7 +86,6 @@ def apply_settings_to_runtime(settings):
             'end_row': plc_reader.beername_end_row
         }]
     plc_reader.beername_ranges = ranges
-    plc_reader._carousel_current_index = 0
 
     plc_config = settings.get('plc', {})
     new_ip = plc_config.get('plc_ip', "192.168.60.201")
@@ -133,7 +130,7 @@ class ZMBPlcReader:
         self.gs_title = 'ZMB-' + str(datetime.date.today())[:-3]
         self.gs_enabled = gs_config.get('enabled', False)
         
-        # 酒款名稱寫入設定（輪播模式）
+        # 酒款名稱寫入設定（更新模式 - 合併範圍 1+ 範圍 2）
         beername_config = settings.get('beername', {})
         self.beername_enabled = beername_config.get('enabled', False)
         self.beername_sheet_url = beername_config.get('sheet_url', 'https://docs.google.com/spreadsheets/d/1QUh-ZHlJSFG0RhkmP0JT7WBxRUqC8EgCMwGn7lZVQas/edit#gid=877936540')
@@ -143,12 +140,10 @@ class ZMBPlcReader:
         self.beername_end_row = beername_config.get('end_row', 23)  # 預設到第 23 行
         self.beername_db_number = beername_config.get('db_number', 142)  # PLC DB 編號
         self.beername_string_size = beername_config.get('string_size', 256)  # 每個酒款字串大小
-        self.beername_write_interval = beername_config.get('write_interval', 300)  # 寫入間隔
+        self.beername_update_interval = beername_config.get('update_interval', 300)  # 更新間隔（秒）
         
-        # 輪播設定（預設啟用）
-        self.beername_carousel_enabled = beername_config.get('carousel_enabled', True)
-        self.beername_carousel_interval = beername_config.get('carousel_interval', 10)  # 輪播間隔（秒）
-        self.beername_ranges = beername_config.get('ranges', [])  # 輪播範圍列表
+        # 範圍設定（合併範圍 1+ 範圍 2）
+        self.beername_ranges = beername_config.get('ranges', [])
         if not self.beername_ranges:
             self.beername_ranges = [{
                 'worksheet_title': self.beername_worksheet_title,
@@ -156,10 +151,6 @@ class ZMBPlcReader:
                 'start_row': self.beername_start_row,
                 'end_row': self.beername_end_row
             }]
-        
-        # 輪播狀態追蹤
-        self._carousel_current_index = 0
-        self._carousel_last_rotation_time = 0
         
         # 資料庫設定
         db_config = settings.get('database', {})
@@ -431,52 +422,75 @@ class ZMBPlcReader:
                 pass
     
     def write_beername_to_plc(self):
-        """從 Google Sheet 讀取酒款名稱並寫入 PLC DB142（使用 Big5 編碼）- 輪播模式"""
+        """從 Google Sheet 讀取酒款名稱並寫入 PLC DB142（使用 Big5 編碼）- 合併範圍 1+ 範圍 2"""
         try:
-            return self._write_beername_with_carousel()
+            return self._write_beername_merged()
         except Exception as e:
             print(f"寫入酒款名稱到 PLC 失敗：{e}")
             return False
     
-    def _write_beername_with_carousel(self):
-        """輪播模式寫入 - 每次寫入一個範圍後等待間隔時間再寫入下一個範圍"""
+    def _write_beername_merged(self):
+        """合併模式寫入 - 將範圍 1 和範圍 2 的對應行號酒款名稱合併後寫入 PLC（B2+E2、B3+E3、...）"""
         if not self.beername_ranges:
-            print("輪播範圍為空，略過酒款名稱寫入")
+            print("範圍設定為空，略過酒款名稱寫入")
             return False
 
-        # 獲取當前範圍設定
-        current_range = self.beername_ranges[self._carousel_current_index]
-        
         try:
             gc = pygsheets.authorize(service_account_file=self.gs_key)
             ss = gc.open_by_url(self.beername_sheet_url)
             
-            # 根據範圍類型獲取工作表
-            if 'worksheet_title' in current_range:
-                wks = ss.worksheet_by_title(current_range['worksheet_title'])
+            # 獲取第一個範圍的設定
+            range1 = self.beername_ranges[0]
+            range2 = self.beername_ranges[1] if len(self.beername_ranges) > 1 else None
+            
+            # 獲取工作表
+            if 'worksheet_title' in range1:
+                wks1 = ss.worksheet_by_title(range1['worksheet_title'])
             else:
-                wks = ss.worksheet_by_title(self.beername_worksheet_title)
+                wks1 = ss.worksheet_by_title(self.beername_worksheet_title)
             
-            # 讀取指定列的酒款名稱
-            start_row = current_range.get('start_row', self.beername_start_row)
-            end_row = current_range.get('end_row', self.beername_end_row)
-            column_index = current_range.get('column_index', self.beername_column_index)
+            if range2:
+                if 'worksheet_title' in range2:
+                    wks2 = ss.worksheet_by_title(range2['worksheet_title'])
+                else:
+                    wks2 = ss.worksheet_by_title(self.beername_worksheet_title)
+            else:
+                wks2 = None
             
-            beername = wks.get_col(column_index)[start_row-1:end_row-1]
+            # 讀取範圍 1 和範圍 2 的酒款名稱
+            start_row = range1.get('start_row', self.beername_start_row)
+            end_row = range1.get('end_row', self.beername_end_row)
+            column_index1 = range1.get('column_index', self.beername_column_index)
             
-            print(f"輪播範圍 {self._carousel_current_index + 1}: 讀取 {len(beername)} 個酒款名稱")
+            col_data1 = wks1.get_col(column_index1)
+            col_data2 = wks2.get_col(range2.get('column_index', self.beername_column_index)) if wks2 else None
             
-            # 寫入當前範圍的資料到 PLC
-            result = self._write_beername_to_plc(beername)
-
-            # 切換到下一個範圍（為下次呼叫準備）
-            self._carousel_current_index = (self._carousel_current_index + 1) % len(self.beername_ranges)
+            # 讀取第 2-23 行（共 22 個）
+            beername1 = col_data1[start_row-1:23]
+            beername2 = col_data2[start_row-1:23] if col_data2 else None
             
-            print(f"輪播切換到範圍 {self._carousel_current_index + 1}/{len(self.beername_ranges)}")
+            # 將對應行號的酒款名稱合併成一個字串
+            all_beernames = []
+            for i in range(len(beername1)):
+                if beername2 and i < len(beername2):
+                    # 合併範圍 1 和範圍 2 的酒款名稱
+                    combined = beername1[i] + beername2[i]
+                    all_beernames.append(combined)
+                else:
+                    all_beernames.append(beername1[i])
+            
+            print(f"範圍 1: 讀取 {len(beername1)} 個酒款名稱 (column_index={column_index1}, 實際讀取：{beername1})")
+            if beername2:
+                print(f"範圍 2: 讀取 {len(beername2)} 個酒款名稱 (column_index={range2.get('column_index')}, 實際讀取：{beername2})")
+            print(f"合併後總共 {len(all_beernames)} 個酒款名稱")
+            print(f"酒款名稱列表：{all_beernames}")
+            
+            # 寫入合併後的資料到 PLC
+            result = self._write_beername_to_plc(all_beernames)
             
             return result
         except Exception as e:
-            print(f"輪播寫入失敗：{e}")
+            print(f"合併寫入失敗：{e}")
             return False
     
     def _write_beername_to_plc(self, beername):
@@ -486,8 +500,14 @@ class ZMBPlcReader:
             client = snap7.client.Client()
             client.connect(self.plc_ip, self.plc_rack, self.plc_slot)
             
+            # 計算最大可寫入的酒款數量（DB 大小限制）
+            max_beer_count = 22  # DB142 通常大小為 5632 位元組，5632/256 = 22
+            actual_count = min(len(beername), max_beer_count)
+            
+            print(f"準備寫入 {len(beername)} 個酒款名稱，實際寫入 {actual_count} 個（DB 大小限制）")
+            
             # 將每個酒款名稱寫入 PLC 的 DB 區塊（使用 Big5 編碼）
-            for i in range(len(beername)):
+            for i in range(actual_count):
                 data = bytearray(self.beername_string_size)
                 
                 # 使用 Big5 編碼轉換繁體中文
@@ -510,10 +530,12 @@ class ZMBPlcReader:
                 for j in range(actual_len):
                     data[2 + j] = beername_bytes[j]
                 
-                client.db_write(db_number=self.beername_db_number, start=i*self.beername_string_size, data=data)
+                address = i * self.beername_string_size
+                print(f"寫入酒款 {i+1}/{actual_count}: {beername[i]} (地址：{address})")
+                client.db_write(db_number=self.beername_db_number, start=address, data=data)
             
             client.disconnect()
-            print(f"成功寫入 {len(beername)} 個酒款名稱到 PLC DB{self.beername_db_number}（Big5 編碼）")
+            print(f"成功寫入 {actual_count} 個酒款名稱到 PLC DB{self.beername_db_number}（Big5 編碼）")
             return True
         except Exception as e:
             print(f"寫入酒款名稱到 PLC 失敗：{e}")
@@ -552,10 +574,10 @@ def plc_data_updater():
                         plc_reader.write_to_google_sheet(data)
                     last_write_time = current_time
 
-                # 酒款輪播獨立觸發，不再綁定 write_interval（5 分鐘）
+                # 酒款更新獨立觸發，不再綁定 write_interval（5 分鐘）
                 if plc_reader and plc_reader.beername_enabled:
-                    carousel_interval = plc_reader.beername_carousel_interval if plc_reader.beername_carousel_interval > 0 else 10
-                    if current_time - last_beername_write >= carousel_interval:
+                    update_interval = plc_reader.beername_update_interval if plc_reader.beername_update_interval > 0 else 300
+                    if current_time - last_beername_write >= update_interval:
                         plc_reader.write_beername_to_plc()
                         last_beername_write = current_time
         except Exception as e:

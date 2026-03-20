@@ -19,4 +19,4 @@ RUN python3 -m pip install -r requirements.txt
 EXPOSE 8001
 
 # 預設運行 Flask 網頁應用程式
-CMD ["python3", "app.py"]
+CMD ["python3", "-u", "app.py"]
