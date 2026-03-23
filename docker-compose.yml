@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  plc2google:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: plc2google
+    restart: always
+    ports:
+      - "8001:8001"
+    environment:
+      - TZ=Asia/Taipei
