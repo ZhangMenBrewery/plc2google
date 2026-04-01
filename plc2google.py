@@ -69,6 +69,8 @@ class zmb_plc():
     def write_to_sheet(self,ss):
         client = snap7.client.Client()
         client.connect("192.168.60.201", 0, 2)
+        print(f"[DEBUG] write_to_sheet - 當前 Google Sheet 標題：{self.__gs_title}")
+        print(f"[DEBUG] write_to_sheet - 預期本月標題：ZMB-{str(datetime.date.today())[:-3]}")
     #    plc_di = client.eb_read(0, 7)
     #    print(snap7.util.get_bool(plc_di,6,1))
     #    plc_do = client.ab_read(0 ,11)
@@ -134,6 +136,8 @@ class zmb_plc():
         client = snap7.client.Client()
         client.connect("192.168.60.201", 0, 2)
         token = 'ypWJFnAK7qffYVaHFsDZgXNfhc1RZs5DekSkKVB73kO'
+        print(f"[DEBUG] write_to_sheet_sql - 當前 Google Sheet 標題：{self.__gs_title}")
+        print(f"[DEBUG] write_to_sheet_sql - 預期本月標題：ZMB-{str(datetime.date.today())[:-3]}")
     #    plc_di = client.eb_read(0, 7)
     #    print(snap7.util.get_bool(plc_di,6,1))
     #    plc_do = client.ab_read(0 ,11)

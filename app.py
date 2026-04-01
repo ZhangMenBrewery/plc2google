@@ -265,15 +265,44 @@ class ZMBPlcReader:
         
         # 動態生成 Google Sheet 標題，確保換日時使用正確的日期
         gs_title = 'ZMB-' + str(datetime.date.today())[:-3]
+        print(f"[DEBUG] write_to_google_sheet - 使用標題：{gs_title}")
         
         try:
             gc = pygsheets.authorize(service_account_file=self.gs_key)
             
             try:
                 ss = gc.open(gs_title)
+                print(f"[DEBUG] 找到現有 Google Sheet: {gs_title}")
+                # 確保現有表格也有被分享給指定人員 (處理之前的遺漏)
+                zmb_group = ['zhangmenbrewery@gmail.com', 'chunkai721@gmail.com']
+                for member in zmb_group:
+                    try:
+                        ss.share(member, role='writer', type='user')
+                    except Exception as e:
+                        print(f"[DEBUG] 補分享給 {member} 失敗：{e}")
             except pygsheets.SpreadsheetNotFound:
-                ss = gc.sheet.create(gs_title)
-                ss.share('', role='reader', type='anyone')
+                print(f"[DEBUG] 創建新的 Google Sheet: {gs_title}")
+                # gc.create 返回 pygsheets.Spreadsheet 對象
+                ss = gc.create(gs_title)
+                # 分享給指定人員
+                zmb_group = ['zhangmenbrewery@gmail.com', 'chunkai721@gmail.com']
+                for member in zmb_group:
+                    try:
+                        ss.share(member, role='writer', type='user')
+                        print(f"[DEBUG] 已分享給 {member}")
+                    except Exception as e:
+                        print(f"[DEBUG] 分享給 {member} 失敗：{e}")
+                
+                try:
+                    ss.share('', role='reader', type='anyone')
+                except Exception as e:
+                    print(f"[DEBUG] 設置公開檢視失敗：{e}")
+                
+                # 刪除預設的 sheet1
+                try:
+                    ss.del_worksheet(ss.sheet1)
+                except Exception as e:
+                    print(f"[DEBUG] 刪除預設工作表失敗：{e}")
             
             success_count = 0
             for region, region_data in data.items():
@@ -283,7 +312,13 @@ class ZMBPlcReader:
                         wks = ss.worksheet_by_title(region)
                     except pygsheets.WorksheetNotFound:
                         tags = self.plc_tag.get(region, {})
-                        letter = string.ascii_uppercase[len(tags) + 1] if len(tags) < 26 else 'A'
+                        num_cols = len(tags) + 1
+                        # 處理欄位英文字母 (A=1, Z=26)
+                        if num_cols <= 26:
+                            letter = string.ascii_uppercase[num_cols - 1]
+                        else:
+                            letter = 'Z'
+                            
                         header = ['Time'] + list(tags.keys())
                         wks = ss.add_worksheet(title=region, rows=10000, cols=len(header))
                         wks.update_values(f'A1:{letter}1', [header])
@@ -296,7 +331,12 @@ class ZMBPlcReader:
                     for tag_name in self.plc_tag.get(region, {}).keys():
                         data_row.append(region_data.get(tag_name, ''))
                     
-                    last_col = string.ascii_uppercase[min(len(self.plc_tag.get(region, {})) + 1, 26)]
+                    num_cols = len(self.plc_tag.get(region, {})) + 1
+                    if num_cols <= 26:
+                        last_col = string.ascii_uppercase[num_cols - 1]
+                    else:
+                        last_col = 'Z'
+                        
                     wks.update_values(f'A{rows}:{last_col}{rows}', [data_row])
                     success_count += 1
                 except Exception as e:
